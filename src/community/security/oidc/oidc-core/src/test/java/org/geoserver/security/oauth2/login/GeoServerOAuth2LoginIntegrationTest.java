@@ -198,7 +198,10 @@ public class GeoServerOAuth2LoginIntegrationTest extends GeoServerSystemTestSupp
     private String reqParamNonce;
 
     public void setupWireMock() throws Exception {
-        System.setProperty(GeoServerOAuth2LoginFilterConfig.OPENID_TEST_GS_PROXY_BASE, "http://localhost/geoserver");
+        // Must match baseRedirectUri (without trailing slash) so that after XStream deserialization,
+        // resolveBaseRedirectUri() returns the same base that the test assertions expect.
+        System.setProperty(
+                GeoServerOAuth2LoginFilterConfig.OPENID_TEST_GS_PROXY_BASE, "http://localhost:8080/geoserver");
 
         openIdService = new WireMockServer(wireMockConfig()
                 .dynamicPort()
@@ -296,8 +299,9 @@ public class GeoServerOAuth2LoginIntegrationTest extends GeoServerSystemTestSupp
     public void testBearerJwtAuthenticatesNoRedirect() throws Exception {
         RSAKey rsa = new RSAKeyGenerator(2048).keyID("kid-1").generate();
         String jwksPath = "/jwks-rs.json";
-        repointJwkSetUri(jwksPath);
+        // IMPORTANT: Register stub BEFORE updating config to avoid JWKS fetch timeout
         stubJwks(jwksPath, rsa.toPublicJWK());
+        repointJwkSetUri(jwksPath);
 
         String token = signJwt(rsa, "m2m@example.com", List.of("R1", "R2"), List.of());
 
@@ -323,8 +327,9 @@ public class GeoServerOAuth2LoginIntegrationTest extends GeoServerSystemTestSupp
     public void testBearerJwtIsStatelessNotSavedInSession() throws Exception {
         RSAKey rsa = new RSAKeyGenerator(2048).keyID("kid-1").generate();
         String jwksPath = "/jwks-rs.json";
-        repointJwkSetUri(jwksPath);
+        // IMPORTANT: Register stub BEFORE updating config to avoid JWKS fetch timeout
         stubJwks(jwksPath, rsa.toPublicJWK());
+        repointJwkSetUri(jwksPath);
 
         String token = signJwt(rsa, "m2m@example.com", List.of("R1"), List.of());
 
@@ -354,8 +359,9 @@ public class GeoServerOAuth2LoginIntegrationTest extends GeoServerSystemTestSupp
     public void testBearerJwtInvalidSignatureNoRedirect() throws Exception {
         RSAKey jwksKey = new RSAKeyGenerator(2048).keyID("kid-1").generate();
         String jwksPath = "/jwks-rs.json";
-        repointJwkSetUri(jwksPath);
+        // IMPORTANT: Register stub BEFORE updating config to avoid JWKS fetch timeout
         stubJwks(jwksPath, jwksKey.toPublicJWK());
+        repointJwkSetUri(jwksPath);
 
         // Sign with a different key, so signature verification must fail.
         RSAKey signerKey = new RSAKeyGenerator(2048).keyID("kid-2").generate();
@@ -385,8 +391,9 @@ public class GeoServerOAuth2LoginIntegrationTest extends GeoServerSystemTestSupp
 
         RSAKey rsa = new RSAKeyGenerator(2048).keyID("kid-1").generate();
         String jwksPath = "/jwks-rs.json";
-        repointJwkSetUri(jwksPath);
+        // IMPORTANT: Register stub BEFORE updating config to avoid JWKS fetch timeout
         stubJwks(jwksPath, rsa.toPublicJWK());
+        repointJwkSetUri(jwksPath);
 
         // aud does NOT contain "geoserver"
         String token = signJwt(rsa, "m2m@example.com", List.of("R1"), List.of("other-aud"));
@@ -418,8 +425,9 @@ public class GeoServerOAuth2LoginIntegrationTest extends GeoServerSystemTestSupp
             // Prepare JWKS + JWT (even though RS mode is disabled; token must be ignored)
             RSAKey rsa = new RSAKeyGenerator(2048).keyID("kid-1").generate();
             String jwksPath = "/jwks-disabled.json";
-            repointJwkSetUri(jwksPath);
+            // IMPORTANT: Register stub BEFORE updating config to avoid JWKS fetch timeout
             stubJwks(jwksPath, rsa.toPublicJWK());
+            repointJwkSetUri(jwksPath);
             String token = signJwt(rsa, "m2m@example.com", List.of("R1"), List.of());
 
             MockHttpServletRequest req = createRequest("web/");
