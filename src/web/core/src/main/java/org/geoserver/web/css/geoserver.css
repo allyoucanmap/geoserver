@@ -1647,3 +1647,13 @@ button.outline-danger,
   --gs-btn-disabled-border-color: #dc3545;
   --gs-gradient: none;
 }
+
+.gs-envelope .gn-unordered-list-class {
+    display: flex;
+    flex-direction: row;
+}
+
+.bounding-box-controls {
+    display:flex;
+    flex-direction: column;
+}
