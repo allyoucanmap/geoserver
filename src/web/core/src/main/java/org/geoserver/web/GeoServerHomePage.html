@@ -1,21 +1,6 @@
 <html xmlns:wicket="http://wicket.apache.org/">
 <body>
 <wicket:extend>
-<div id="chooser">
-  <form wicket:id="form">
-    <div class="select">
-			<img class="icon" src="#" wicket:id="workspace.icon" wicket:message="title:workspace"/>
-			<span wicket:id="workspace"/>
-	  </div>
-    <div class="select">
-		  <img class="icon" src="#" wicket:id="layer.icon" wicket:message="title:layer"/>
-		  <span wicket:id="layer"/>
-	  </div>
-    <div id="refresh">
-		  <a href="#" wicket:id="refresh">refresh</a>
-	  </div>
-  </form>
-</div>
 <div id="welcome">
 <p>
 	<span wicket:id="welcome"></span>
@@ -83,12 +68,10 @@
 			<div class="catalog-link-content">
 				<h5>
 					<a wicket:id="layersLink">
-						<span wicket:id="nlayers"></span> <wicket:message key="layers">layers</wicket:message>
+						<wicket:message key="layers">layers</wicket:message>
+						<span wicket:id="nlayers"></span> 
 					</a>
 				</h5>
-				<a wicket:id="addLayerLink" class="button outline-primary">
-					<wicket:message key="addLayers">Add new layer</wicket:message>
-				</a>
 			</div>
 		</div>
 
@@ -96,12 +79,10 @@
 			<div class="catalog-link-content">
 				<h5>
 					<a wicket:id="groupsLink">
-						<span wicket:id="ngroups"></span> <wicket:message key="groups">groups</wicket:message>
+						<wicket:message key="groups">groups</wicket:message>
+						<span wicket:id="ngroups"></span> 
 					</a>
 				</h5>
-				<a wicket:id="addGroupLink" class="button outline-primary">
-					<wicket:message key="addGroups">Add new layer group</wicket:message>
-				</a>
 			</div>
 		</div>
 
@@ -109,12 +90,10 @@
 			<div class="catalog-link-content">
 				<h5>
 					<a wicket:id="storesLink">
-						<span wicket:id="nstores"></span> <wicket:message key="stores">stores</wicket:message>
+						<wicket:message key="stores">stores</wicket:message>
+						<span wicket:id="nstores"></span> 
 					</a>
 				</h5>
-				<a wicket:id="addStoreLink" class="button outline-primary">
-					<wicket:message key="addStores">Add new store</wicket:message>
-				</a>
 			</div>
 		</div>
 
@@ -122,12 +101,10 @@
 			<div class="catalog-link-content">
 				<h5>
 					<a wicket:id="workspacesLink">
-						<span wicket:id="nworkspaces"></span> <wicket:message key="workspaces">workspaces</wicket:message>
+						<wicket:message key="workspaces">workspaces</wicket:message>
+						<span wicket:id="nworkspaces"></span> 
 					</a>
 				</h5>
-				<a wicket:id="addWorkspaceLink" class="button outline-primary">
-					<wicket:message key="addWorkspaces">Add new workspaces</wicket:message>
-				</a>
 			</div>
 		</div>
 

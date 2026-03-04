@@ -77,6 +77,104 @@
         }
         initializeNavigationMenu();
 
+        // Sidebar "New" menu: toggle on button, close on outside click or ESC
+        function initializeSidebarNewMenu() {
+            const toggleButton = document.getElementById('gs-sidebar-new-toggle');
+            const menu = document.getElementById('gs-sidebar-new-menu');
+            if (!toggleButton || !menu) return;
+
+            function closeMenu() {
+                menu.setAttribute('hidden', 'hidden');
+                toggleButton.setAttribute('aria-expanded', 'false');
+            }
+
+            function openMenu() {
+                menu.removeAttribute('hidden');
+                toggleButton.setAttribute('aria-expanded', 'true');
+            }
+
+            function isMenuOpen() {
+                return !menu.hasAttribute('hidden');
+            }
+
+            toggleButton.addEventListener('click', function() {
+                if (isMenuOpen()) {
+                    closeMenu();
+                    return;
+                }
+                openMenu();
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!isMenuOpen()) return;
+                if (!toggleButton.contains(e.target) && !menu.contains(e.target)) {
+                    closeMenu();
+                }
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && isMenuOpen()) {
+                    closeMenu();
+                    toggleButton.focus();
+                }
+            });
+        }
+        initializeSidebarNewMenu();
+
+        // Sidebar tree toggles: right chevron when closed, down when open
+        function initializeSidebarWorkspaceTree() {
+            const toggles = document.querySelectorAll('.gs-sidebar-tree-toggle');
+            if (!toggles.length) return;
+
+            toggles.forEach(function(toggle) {
+                const controlsId = toggle.getAttribute('aria-controls');
+                if (!controlsId) return;
+
+                const list = document.getElementById(controlsId);
+                if (!list) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+
+                function openList() {
+                    list.removeAttribute('hidden');
+                    toggle.setAttribute('aria-expanded', 'true');
+                }
+
+                function closeList() {
+                    list.setAttribute('hidden', 'hidden');
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+
+                function isOpen() {
+                    return !list.hasAttribute('hidden');
+                }
+
+                toggle.setAttribute('aria-expanded', isOpen() ? 'true' : 'false');
+
+                toggle.addEventListener('click', function(e) {
+                    if (e.target && e.target.closest && e.target.closest('.gs-sidebar-workspace-link')) {
+                        return;
+                    }
+                    isOpen() ? closeList() : openList();
+                });
+
+                toggle.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowRight' && !isOpen()) {
+                        e.preventDefault();
+                        openList();
+                    } else if (e.key === 'ArrowLeft' && isOpen()) {
+                        e.preventDefault();
+                        closeList();
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        isOpen() ? closeList() : openList();
+                    }
+                });
+            });
+        }
+        initializeSidebarWorkspaceTree();
+
         // User dropdown: click avatar to toggle, close on outside click or ESC
         function initializeUserDropdown() {
             const trigger = document.querySelector('#user-avatar-trigger');

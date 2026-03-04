@@ -108,24 +108,156 @@
       </div>
       <div class="gs-header-backdrop" id="header-backdrop" aria-hidden="true"></div>
     </div><!-- /#header -->
-    <div id="main">
-      <div class="wrap selfclear">
-        <div id="page" class="selfclear">
-          <div class="page-header">
-            <div id="topFeedback" wicket:id="topFeedback"></div>
-            <h1 wicket:id="gbpTitle" id="header-title"></h1>
-            <p wicket:id="gbpDescription" id="header-description"></p>
-            <div wicket:id="headerPanel" class="header-panel"></div>
-          </div>
+    <div id="main" class="gs-main">
+      <div class="gs-main-content">
+        <div class="gs-content-layout">
+          <aside id="sidebar" class="gs-sidebar" aria-label="Sidebar navigation">
+            <div class="gs-sidebar-new">
+              <button
+                id="gs-sidebar-new-toggle"
+                class="gs-sidebar-new-button"
+                type="button"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="gs-sidebar-new-menu"
+              >
+                <span aria-hidden="true">+</span>
+                <span>New</span>
+              </button>
+              <ul id="gs-sidebar-new-menu" class="gs-sidebar-new-menu" hidden="hidden">
+                <li><a wicket:id="addLayerLink">New layer</a></li>
+                <li><a wicket:id="addGroupLink">New layer group</a></li>
+                <li><a wicket:id="addStoreLink">New store</a></li>
+                <li><a wicket:id="addWorkspaceLink">New workspace</a></li>
+              </ul>
+            </div>
+            <div class="gs-sidebar-content">
+              <div class="gs-sidebar-search">
+                <div class="gs-sidebar-search-title">WORKSPACES</div>
+                <div class="gs-sidebar-search-box">
+                  <input
+                    class="gs-sidebar-search-input"
+                    type="search"
+                    placeholder="Filter workspaces..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </div>
+                <div class="gs-sidebar-search-status"></div>
+              </div>
+              <ul class="gs-sidebar-content-wrapper">
+                <li class="gs-sidebar-item">
+                  <div wicket:id="globalToggle" class="gs-sidebar-section-header">
+                    <span wicket:id="globalLabel" class="gs-list-name">GLOBAL</span>
+                    <span wicket:id="globalCount" class="gs-count">0</span>
+                  </div>
+                  <ul id="gs-global-list" wicket:id="globalLayers">
+                    <li><a href="#" wicket:id="layerLink"><span wicket:id="layerName">layer</span></a></li>
+                  </ul>
+                </li>
+                <li class="gs-sidebar-item">
+                  <div wicket:id="workspacesToggle" class="gs-sidebar-section-header">
+                    <span wicket:id="workspacesLabel" class="gs-list-name">ALL</span>
+                    <span wicket:id="workspacesCount" class="gs-count">0</span>
+                  </div>
+                  <ul id="gs-workspaces-list" class="gs-sidebar-workspace-items" wicket:id="workspaceItems">
+                    <li class="gs-sidebar-item">
+                      <button
+                        wicket:id="workspaceToggle"
+                        class="gs-sidebar-tree-toggle"
+                        aria-expanded="false"
+                        aria-controls="gs-workspace-layers-0"
+                      >
+                        <span class="gs-sidebar-disclosure" aria-hidden="true"></span>
+                        <svg class="wic" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>
+                        <a href="#" wicket:id="workspaceLink" class="gs-sidebar-workspace-link gs-list-name"><span wicket:id="workspaceLabel">workspace</span></a>
+                        <span wicket:id="workspaceCount" class="gs-count">0</span>
+                      </button>
+                      <ul wicket:id="workspaceLayersContainer" hidden="hidden" class="gs-sidebar-workspace-layers">
+                        <li wicket:id="workspaceLayers">
+                          <a class="gs-layer-link" href="#" wicket:id="layerLink">
+                            <span wicket:id="layerIcon" class="gs-layer-icon"></span>
+                            <span wicket:id="layerName">layer</span>
+                          </a>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                  <div class="gs-sidebar-pagination">
+                    <button class="gs-sidebar-pagination-button" type="button" disabled>Prev</button>
+                    <span class="gs-sidebar-pagination-info"></span>
+                    <button class="gs-sidebar-pagination-button" type="button" disabled>Next</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </aside>
+          <div class="wrap selfclear">
+            <div id="breadcrumbs" aria-label="Breadcrumbs" class="gs-breadcrumbs">
+              <ul class="gs-breadcrumbs-list">
+                <li class="gs-breadcrumb-item" wicket:id="breadcrumbItems">
+                  <a href="#" wicket:id="breadcrumbLink">
+                    <span wicket:id="globalIcon" class="gs-breadcrumb-global-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                      </svg>
+                    </span>
+                    <span wicket:id="workspaceIcon" class="gs-breadcrumb-workspace-icon">
+                      <svg class="wic" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path>
+                      </svg>
+                    </span>
+                    <span wicket:id="breadcrumbLayerIcon" class="gs-breadcrumb-layer-icon gs-layer-icon"></span>
+                    <span wicket:id="label">Global</span>
+                  </a>
+                  <div wicket:id="breadcrumbCurrent" class="gs-breadcrumb-current">
+                    <button class="gs-breadcrumb-current-toggle">
+                      <span wicket:id="currentGlobalIcon" class="gs-breadcrumb-global-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
+                      </span>
+                      <span wicket:id="currentWorkspaceIcon" class="gs-breadcrumb-workspace-icon">
+                        <svg class="wic" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path>
+                        </svg>
+                      </span>
+                      <span wicket:id="currentLayerIcon" class="gs-breadcrumb-layer-icon gs-layer-icon"></span>
+                      <span wicket:id="currentLabel">Current</span>
+                    </button>
+                    <ul class="gs-breadcrumb-current-menu">
+                      <li wicket:id="breadcrumbCurrentOptions" class="gs-breadcrumb-option">
+                        <span wicket:id="optionHeading" class="gs-breadcrumb-option-heading">Heading</span>
+                        <a href="#" wicket:id="optionLink" class="gs-breadcrumb-option-link">
+                          <span wicket:id="optionLabel" class="gs-breadcrumb-option-label">Item 1</span>
+                          <span wicket:id="optionValue" class="gs-breadcrumb-option-value"></span>
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            <div id="page" class="selfclear">
+              <div class="page-header">
+                <div id="topFeedback" wicket:id="topFeedback"></div>
+                <h1 wicket:id="gbpTitle" id="header-title"></h1>
+                <p wicket:id="gbpDescription" id="header-description"></p>
+                <div wicket:id="headerPanel" class="header-panel"></div>
+              </div>
 
-          <div class="page-pane selfclear" id="page-pane">
-            <wicket:child></wicket:child>
-          </div>
-          <div class="page-footer">
-            <div id="bottomFeedback" wicket:id="bottomFeedback"></div>
-          </div>
-        </div><!-- /#page -->
-      </div><!-- /.wrap -->
+              <div class="page-pane selfclear" id="page-pane">
+                <wicket:child></wicket:child>
+              </div>
+              <div class="page-footer">
+                <div id="bottomFeedback" wicket:id="bottomFeedback"></div>
+              </div>
+            </div><!-- /#page -->
+          </div><!-- /.wrap -->
+        </div>
+      </div>
     </div><!-- /#main -->
   </body>
 </html>

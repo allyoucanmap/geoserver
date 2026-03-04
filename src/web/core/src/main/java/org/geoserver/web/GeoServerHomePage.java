@@ -56,12 +56,8 @@ import org.geoserver.config.ServiceInfo;
 import org.geoserver.config.SettingsInfo;
 import org.geoserver.util.InternationalStringUtils;
 import org.geoserver.web.data.layer.LayerPage;
-import org.geoserver.web.data.layer.NewLayerPage;
-import org.geoserver.web.data.layergroup.LayerGroupEditPage;
 import org.geoserver.web.data.layergroup.LayerGroupPage;
-import org.geoserver.web.data.store.NewDataPage;
 import org.geoserver.web.data.store.StorePage;
-import org.geoserver.web.data.workspace.WorkspaceNewPage;
 import org.geoserver.web.data.workspace.WorkspacePage;
 import org.geotools.api.util.InternationalString;
 import org.geotools.feature.NameImpl;
@@ -534,19 +530,19 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
 
             catalogLinks.add(new BookmarkablePageLink<>("layersLink", LayerPage.class)
                     .add(new Label("nlayers", numberFormat.format(layerCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addLayerLink", NewLayerPage.class));
+            // catalogLinks.add(new BookmarkablePageLink<>("addLayerLink", NewLayerPage.class));
 
             catalogLinks.add(new BookmarkablePageLink<>("groupsLink", LayerGroupPage.class)
                     .add(new Label("ngroups", numberFormat.format(groupCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addGroupLink", LayerGroupEditPage.class));
+            // catalogLinks.add(new BookmarkablePageLink<>("addGroupLink", LayerGroupEditPage.class));
 
             catalogLinks.add(new BookmarkablePageLink<>("storesLink", StorePage.class)
                     .add(new Label("nstores", numberFormat.format(storesCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addStoreLink", NewDataPage.class));
+            // catalogLinks.add(new BookmarkablePageLink<>("addStoreLink", NewDataPage.class));
 
             catalogLinks.add(new BookmarkablePageLink<>("workspacesLink", WorkspacePage.class)
                     .add(new Label("nworkspaces", numberFormat.format(wsCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addWorkspaceLink", WorkspaceNewPage.class));
+            // catalogLinks.add(new BookmarkablePageLink<>("addWorkspaceLink", WorkspaceNewPage.class));
             return catalogLinks;
         } finally {
             sw.stop();
