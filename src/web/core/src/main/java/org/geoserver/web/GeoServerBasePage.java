@@ -33,6 +33,8 @@ import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.WebPage;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.DropDownChoice;
+import org.apache.wicket.markup.html.form.Form;
+import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.markup.html.image.Image;
 import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.link.ExternalLink;
@@ -41,6 +43,7 @@ import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.Model;
+import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.StringResourceModel;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebResponse;
@@ -50,6 +53,7 @@ import org.apache.wicket.request.resource.PackageResourceReference;
 import org.apache.wicket.resource.JQueryResourceReference;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.FeatureTypeInfo;
+import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.config.GeoServer;
@@ -116,6 +120,9 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
     protected Class<? extends Page> returnPageClass;
 
     public static final String VERSION_3 = "jquery/jquery-3.5.1.js";
+
+    /** Optional search text used to filter sidebar workspaces. */
+    private String workspaceSearch;
 
     protected GeoServerBasePage(final PageParameters parameters) {
         super(parameters);
@@ -393,11 +400,38 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         // locale switcher
         add(localeSwitcher());
 
-        // sidebar "New" menu actions
-        add(new BookmarkablePageLink<>("addLayerLink", NewLayerPage.class));
-        add(new BookmarkablePageLink<>("addGroupLink", LayerGroupEditPage.class));
-        add(new BookmarkablePageLink<>("addStoreLink", NewDataPage.class));
-        add(new BookmarkablePageLink<>("addWorkspaceLink", WorkspaceNewPage.class));
+        String selectedWorkspace = getSelectedWorkspaceName();
+        boolean workspaceScopedSearch = selectedWorkspace != null && !selectedWorkspace.isBlank();
+
+        // sidebar "New" menu actions (hidden for anonymous users)
+        WebMarkupContainer sidebarNew = new WebMarkupContainer("sidebarNew");
+        sidebarNew.setVisible(!anonymous);
+        sidebarNew.add(new BookmarkablePageLink<>("addLayerLink", NewLayerPage.class));
+        sidebarNew.add(new BookmarkablePageLink<>("addGroupLink", LayerGroupEditPage.class));
+        sidebarNew.add(new BookmarkablePageLink<>("addStoreLink", NewDataPage.class));
+        sidebarNew.add(new BookmarkablePageLink<>("addWorkspaceLink", WorkspaceNewPage.class));
+        add(sidebarNew);
+
+        WebMarkupContainer searchScopeGlobalIcon = new WebMarkupContainer("searchScopeGlobalIcon");
+        searchScopeGlobalIcon.setVisible(!workspaceScopedSearch);
+        add(searchScopeGlobalIcon);
+        WebMarkupContainer searchScopeWorkspaceIcon = new WebMarkupContainer("searchScopeWorkspaceIcon");
+        searchScopeWorkspaceIcon.setVisible(workspaceScopedSearch);
+        add(searchScopeWorkspaceIcon);
+        add(new Label("searchScopeLabel", workspaceScopedSearch ? selectedWorkspace : "GLOBAL"));
+
+        // sidebar workspace search form (filters server-side list of workspaces on submit/enter)
+        Form<Void> workspaceSearchForm = new Form<>("workspaceSearchForm");
+        workspaceSearchForm.setOutputMarkupId(true);
+        TextField<String> workspaceSearchField =
+                new TextField<>("workspaceSearch", new PropertyModel<>(this, "workspaceSearch"));
+        workspaceSearchField.add(AttributeModifier.replace(
+                "placeholder",
+                workspaceScopedSearch
+                        ? "Search layers and layer groups..."
+                        : "Search workspace, layers and layer groups..."));
+        workspaceSearchForm.add(workspaceSearchField);
+        add(workspaceSearchForm);
 
         // sidebar tree content (global/workspaces and layer lists)
         initializeSidebarContent();
@@ -535,7 +569,7 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                 });
 
         WebMarkupContainer globalToggle = new WebMarkupContainer("globalToggle");
-        globalToggle.add(new Label("globalLabel", "Global"));
+        globalToggle.add(new Label("globalLabel", "GLOBAL"));
         globalToggle.add(new Label("globalCount", new LoadableDetachableModel<Integer>() {
             @Override
             protected Integer load() {
@@ -544,8 +578,18 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         }));
         add(globalToggle);
 
+        WebMarkupContainer pinnedSectionHeading = new WebMarkupContainer("pinnedSectionHeading");
+        pinnedSectionHeading.add(new Label("pinnedLabel", "PINNED"));
+        pinnedSectionHeading.add(new Label("pinnedCount", new LoadableDetachableModel<Integer>() {
+            @Override
+            protected Integer load() {
+                return loadPinnedLayerNames().size();
+            }
+        }));
+        add(pinnedSectionHeading);
+
         WebMarkupContainer workspacesToggle = new WebMarkupContainer("workspacesToggle");
-        workspacesToggle.add(new Label("workspacesLabel", "ALL"));
+        workspacesToggle.add(new Label("workspacesLabel", "WORKSPACES"));
         workspacesToggle.add(new Label("workspacesCount", new LoadableDetachableModel<Integer>() {
             @Override
             protected Integer load() {
@@ -596,7 +640,8 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                                 "workspaceLink", GeoServerHomePage.class, createHomePageParams(entry.getName(), null));
                         workspaceLink.add(new Label("workspaceLabel", entry.getName()));
                         toggle.add(workspaceLink);
-                        toggle.add(new Label("workspaceCount", entry.getLayers().size()));
+                        toggle.add(new Label(
+                                "workspaceCount", entry.getPublishedEntries().size()));
                         item.add(toggle);
 
                         WebMarkupContainer layersContainer = new WebMarkupContainer("workspaceLayersContainer");
@@ -606,32 +651,31 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                         }
                         item.add(layersContainer);
 
-                        ListView<String> layers = new ListView<>("workspaceLayers", entry.getLayers()) {
-                            @Override
-                            protected void populateItem(ListItem<String> layerItem) {
-                                String layerName = layerItem.getModelObject();
+                        ListView<SidebarPublishedEntry> layers =
+                                new ListView<>("workspaceLayers", entry.getPublishedEntries()) {
+                                    @Override
+                                    protected void populateItem(ListItem<SidebarPublishedEntry> layerItem) {
+                                        SidebarPublishedEntry published = layerItem.getModelObject();
 
-                                BookmarkablePageLink<LayerPage> link = new BookmarkablePageLink<>(
-                                        "layerLink",
-                                        GeoServerHomePage.class,
-                                        createHomePageParams(entry.getName(), layerName));
+                                        BookmarkablePageLink<LayerPage> link = new BookmarkablePageLink<>(
+                                                "layerLink",
+                                                GeoServerHomePage.class,
+                                                createHomePageParams(entry.getName(), published.getName()));
 
-                                LayerInfo layerInfo = getCatalog().getLayerByName(entry.getName() + ":" + layerName);
+                                        WebMarkupContainer layerIcon = new WebMarkupContainer("layerIcon");
+                                        String iconVariant = published.getIconCssClass();
+                                        if (!iconVariant.isEmpty()) {
+                                            layerIcon.add(AttributeModifier.append("class", iconVariant));
+                                        }
+                                        link.add(layerIcon);
 
-                                WebMarkupContainer layerIcon = new WebMarkupContainer("layerIcon");
-                                String iconVariant = getLayerIconCssClass(layerInfo);
-                                if (!iconVariant.isEmpty()) {
-                                    layerIcon.add(AttributeModifier.append("class", iconVariant));
-                                }
-                                link.add(layerIcon);
-
-                                link.add(new Label("layerName", layerItem.getModel()));
-                                if (selectedLayer != null && selectedLayer.equals(layerItem.getModelObject())) {
-                                    link.add(AttributeModifier.append("class", "is-active"));
-                                }
-                                layerItem.add(link);
-                            }
-                        };
+                                        link.add(new Label("layerName", published.getName()));
+                                        if (selectedLayer != null && selectedLayer.equals(published.getName())) {
+                                            link.add(AttributeModifier.append("class", "is-active"));
+                                        }
+                                        layerItem.add(link);
+                                    }
+                                };
                         layersContainer.add(layers);
                     }
                 });
@@ -660,33 +704,54 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         return names;
     }
 
+    private List<String> loadPinnedLayerNames() {
+        List<String> names = new ArrayList<>();
+        for (LayerInfo layer : loadAllLayers()) {
+            boolean isEnabled = layer.isEnabled();
+            boolean isAdvertised = layer.isAdvertised();
+            if (isEnabled && isAdvertised) {
+                names.add(layer.prefixedName());
+            }
+        }
+        Collections.sort(names);
+        return names;
+    }
+
     private List<SidebarWorkspaceEntry> loadWorkspaceEntries() {
         Catalog catalog = getCatalog();
         List<WorkspaceInfo> workspaces = new ArrayList<>(catalog.getWorkspaces());
+        String query = workspaceSearch;
+        if (query != null && !query.isBlank()) {
+            String lowered = query.toLowerCase(Locale.ROOT);
+            workspaces.removeIf(ws -> ws.getName() == null
+                    || !ws.getName().toLowerCase(Locale.ROOT).contains(lowered));
+        }
         workspaces.sort((left, right) -> left.getName().compareToIgnoreCase(right.getName()));
 
         List<SidebarWorkspaceEntry> entries = new ArrayList<>(workspaces.size());
         for (int i = 0; i < workspaces.size(); i++) {
             WorkspaceInfo workspace = workspaces.get(i);
-            List<String> layers = loadWorkspaceLayerNames(workspace);
-            String label = workspace.getName() + " (" + layers.size() + ")";
-            entries.add(new SidebarWorkspaceEntry(workspace.getName(), label, "gs-workspace-layers-" + i, layers));
+            List<SidebarPublishedEntry> publishedEntries = loadWorkspacePublishedEntries(workspace);
+            entries.add(new SidebarWorkspaceEntry(workspace.getName(), "gs-workspace-layers-" + i, publishedEntries));
         }
 
         return entries;
     }
 
-    private List<String> loadWorkspaceLayerNames(WorkspaceInfo workspace) {
+    private List<SidebarPublishedEntry> loadWorkspacePublishedEntries(WorkspaceInfo workspace) {
         String workspacePrefix = workspace.getName() + ":";
-        List<String> names = new ArrayList<>();
+        List<SidebarPublishedEntry> entries = new ArrayList<>();
         for (LayerInfo layer : loadAllLayers()) {
             String prefixed = layer.prefixedName();
             if (prefixed.startsWith(workspacePrefix)) {
-                names.add(layer.getName());
+                entries.add(new SidebarPublishedEntry(layer.getName(), getLayerIconCssClass(layer)));
             }
         }
-        Collections.sort(names);
-        return names;
+        for (LayerGroupInfo group : getCatalog().getLayerGroupsByWorkspace(workspace)) {
+            entries.add(new SidebarPublishedEntry(group.getName(), getLayerGroupIconCssClass()));
+        }
+        entries.sort((left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+        return entries;
     }
 
     private String getLayerIconCssClass(LayerInfo layerInfo) {
@@ -719,6 +784,10 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             default:
                 return "";
         }
+    }
+
+    private String getLayerGroupIconCssClass() {
+        return "gs-layer-icon--group";
     }
 
     private List<LayerInfo> loadAllLayers() {
@@ -854,31 +923,43 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
     private static class SidebarWorkspaceEntry {
         private final String name;
-        private final String label;
         private final String listId;
-        private final List<String> layers;
+        private final List<SidebarPublishedEntry> publishedEntries;
 
-        SidebarWorkspaceEntry(String name, String label, String listId, List<String> layers) {
+        SidebarWorkspaceEntry(String name, String listId, List<SidebarPublishedEntry> publishedEntries) {
             this.name = name;
-            this.label = label;
             this.listId = listId;
-            this.layers = layers;
+            this.publishedEntries = publishedEntries;
         }
 
         String getName() {
             return name;
         }
 
-        String getLabel() {
-            return label;
-        }
-
         String getListId() {
             return listId;
         }
 
-        List<String> getLayers() {
-            return layers;
+        List<SidebarPublishedEntry> getPublishedEntries() {
+            return publishedEntries;
+        }
+    }
+
+    private static class SidebarPublishedEntry {
+        private final String name;
+        private final String iconCssClass;
+
+        SidebarPublishedEntry(String name, String iconCssClass) {
+            this.name = name;
+            this.iconCssClass = iconCssClass;
+        }
+
+        String getName() {
+            return name;
+        }
+
+        String getIconCssClass() {
+            return iconCssClass;
         }
     }
 

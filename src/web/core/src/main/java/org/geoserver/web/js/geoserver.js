@@ -121,6 +121,177 @@
         }
         initializeSidebarNewMenu();
 
+        // Sidebar workspace search clear button behavior
+        function initializeSidebarWorkspaceSearchClear() {
+            const searchForm = document.querySelector('.gs-sidebar-search-box');
+            if (!searchForm) return;
+
+            const searchInput = searchForm.querySelector('.gs-sidebar-search-input');
+            const clearButton = searchForm.querySelector('.gs-sidebar-search-clear');
+            if (!searchInput || !clearButton) return;
+
+            function updateClearVisibility() {
+                const hasText = !!(searchInput.value && searchInput.value.trim().length);
+                clearButton.classList.toggle('is-visible', hasText);
+                if (hasText) {
+                    clearButton.removeAttribute('hidden');
+                } else {
+                    clearButton.setAttribute('hidden', 'hidden');
+                }
+            }
+
+            updateClearVisibility();
+            searchInput.addEventListener('input', updateClearVisibility);
+
+            clearButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                searchInput.value = '';
+                updateClearVisibility();
+                searchInput.focus();
+                if (typeof searchForm.requestSubmit === 'function') {
+                    searchForm.requestSubmit();
+                } else {
+                    searchForm.submit();
+                }
+            });
+        }
+        initializeSidebarWorkspaceSearchClear();
+
+        // Sidebar workspace pagination for workspace
+        function initializeSidebarWorkspacePagination() {
+            const workspaceList = document.getElementById('gs-workspaces-list');
+            const pagination = document.querySelector('.gs-sidebar-pagination');
+            if (!workspaceList || !pagination) return;
+
+            const buttons = pagination.querySelectorAll('.gs-sidebar-pagination-button');
+            const pageInfo = pagination.querySelector('.gs-sidebar-pagination-info');
+            if (!buttons.length || buttons.length < 2 || !pageInfo) return;
+
+            const prevButton = buttons[0];
+            const nextButton = buttons[1];
+            const pageSize = 5;
+            const items = Array.prototype.slice.call(
+                workspaceList.querySelectorAll(':scope > .gs-sidebar-item')
+            );
+            if (!items.length) {
+                pageInfo.textContent = '0/0';
+                prevButton.disabled = true;
+                nextButton.disabled = true;
+                return;
+            }
+
+            const totalPages = Math.ceil(items.length / pageSize);
+            let currentPage = 1;
+
+            function renderPage() {
+                const start = (currentPage - 1) * pageSize;
+                const end = start + pageSize;
+
+                items.forEach(function(item, index) {
+                    const visible = index >= start && index < end;
+                    if (visible) {
+                        item.style.display = '';
+                        item.removeAttribute('hidden');
+                    } else {
+                        item.style.display = 'none';
+                        item.setAttribute('hidden', 'hidden');
+                    }
+                });
+
+                pageInfo.textContent = currentPage + '/' + totalPages;
+                prevButton.disabled = currentPage <= 1;
+                nextButton.disabled = currentPage >= totalPages;
+            }
+
+            prevButton.addEventListener('click', function() {
+                if (currentPage <= 1) return;
+                currentPage--;
+                renderPage();
+            });
+
+            nextButton.addEventListener('click', function() {
+                if (currentPage >= totalPages) return;
+                currentPage++;
+                renderPage();
+            });
+
+            renderPage();
+        }
+        initializeSidebarWorkspacePagination();
+
+        // Workspace layer pagination: paginate layers independently per workspace
+        function initializeSidebarWorkspaceLayerPagination() {
+            const layerLists = document.querySelectorAll('.gs-sidebar-workspace-layers');
+            if (!layerLists.length) return;
+
+            const pageSize = 5;
+
+            layerLists.forEach(function(layerList) {
+                const workspaceItem = layerList.closest('.gs-sidebar-item');
+                if (!workspaceItem) return;
+
+                const pagination = workspaceItem.querySelector('.gs-sidebar-layers-pagination');
+                if (!pagination) return;
+
+                const buttons = pagination.querySelectorAll('.gs-sidebar-pagination-button');
+                const pageInfo = pagination.querySelector('.gs-sidebar-pagination-info');
+                if (buttons.length < 2 || !pageInfo) return;
+
+                const prevButton = buttons[0];
+                const nextButton = buttons[1];
+                const items = Array.prototype.slice.call(
+                    layerList.querySelectorAll(':scope > li:not(.gs-sidebar-layers-pagination-item)')
+                );
+
+                if (!items.length) {
+                    pageInfo.textContent = '0/0';
+                    prevButton.disabled = true;
+                    nextButton.disabled = true;
+                    return;
+                }
+
+                const totalPages = Math.ceil(items.length / pageSize);
+                let currentPage = 1;
+
+                function renderPage() {
+                    const start = (currentPage - 1) * pageSize;
+                    const end = start + pageSize;
+
+                    items.forEach(function(item, index) {
+                        const visible = index >= start && index < end;
+                        if (visible) {
+                            item.style.display = '';
+                            item.removeAttribute('hidden');
+                        } else {
+                            item.style.display = 'none';
+                            item.setAttribute('hidden', 'hidden');
+                        }
+                    });
+
+                    pageInfo.textContent = currentPage + '/' + totalPages;
+                    prevButton.disabled = currentPage <= 1;
+                    nextButton.disabled = currentPage >= totalPages;
+                }
+
+                prevButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (currentPage <= 1) return;
+                    currentPage--;
+                    renderPage();
+                });
+
+                nextButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (currentPage >= totalPages) return;
+                    currentPage++;
+                    renderPage();
+                });
+
+                renderPage();
+            });
+        }
+        initializeSidebarWorkspaceLayerPagination();
+
         // Sidebar tree toggles: right chevron when closed, down when open
         function initializeSidebarWorkspaceTree() {
             const toggles = document.querySelectorAll('.gs-sidebar-tree-toggle');

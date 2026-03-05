@@ -112,7 +112,7 @@
       <div class="gs-main-content">
         <div class="gs-content-layout">
           <aside id="sidebar" class="gs-sidebar" aria-label="Sidebar navigation">
-            <div class="gs-sidebar-new">
+            <div wicket:id="sidebarNew" class="gs-sidebar-new">
               <button
                 id="gs-sidebar-new-toggle"
                 class="gs-sidebar-new-button"
@@ -133,22 +133,49 @@
             </div>
             <div class="gs-sidebar-content">
               <div class="gs-sidebar-search">
-                <div class="gs-sidebar-search-title">WORKSPACES</div>
-                <div class="gs-sidebar-search-box">
+                <div class="gs-sidebar-search-title">
+                  <span>Search in</span>
+                  <span wicket:id="searchScopeGlobalIcon" class="gs-search-global-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                  </span>
+                  <span wicket:id="searchScopeWorkspaceIcon" class="gs-search-workspace-icon">
+                    <svg class="wic" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path>
+                    </svg>
+                  </span>
+                  <span wicket:id="searchScopeLabel" class="gs-list-name">GLOBAL</span>
+                </div>
+                <form wicket:id="workspaceSearchForm" class="gs-sidebar-search-box">
                   <input
+                    wicket:id="workspaceSearch"
                     class="gs-sidebar-search-input"
-                    type="search"
-                    placeholder="Filter workspaces..."
+                    type="text"
+                    placeholder="Search workspace, layers and layer groups..."
                     autocomplete="off"
                     spellcheck="false"
                   />
-                </div>
+                  <button type="button" class="gs-sidebar-search-clear" aria-label="Clear search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="20" height="20">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                  </button>
+                  <input type="submit" class="hidden" />
+                </form>
                 <div class="gs-sidebar-search-status"></div>
               </div>
               <ul class="gs-sidebar-content-wrapper">
                 <li class="gs-sidebar-item">
+                  <div wicket:id="pinnedSectionHeading" class="gs-sidebar-section-header">
+                    <span wicket:id="pinnedLabel" class="gs-list-name">PINNED</span>
+                    <span wicket:id="pinnedCount" class="gs-count">0</span>
+                  </div>
+                </li>
+                <li class="gs-sidebar-item">
                   <div wicket:id="globalToggle" class="gs-sidebar-section-header">
-                    <span wicket:id="globalLabel" class="gs-list-name">GLOBAL</span>
+                    <span wicket:id="globalLabel" class="gs-list-name">PINNED</span>
                     <span wicket:id="globalCount" class="gs-count">0</span>
                   </div>
                   <ul id="gs-global-list" wicket:id="globalLayers">
@@ -157,11 +184,11 @@
                 </li>
                 <li class="gs-sidebar-item">
                   <div wicket:id="workspacesToggle" class="gs-sidebar-section-header">
-                    <span wicket:id="workspacesLabel" class="gs-list-name">ALL</span>
+                    <span wicket:id="workspacesLabel" class="gs-list-name">WORKSPACES</span>
                     <span wicket:id="workspacesCount" class="gs-count">0</span>
                   </div>
-                  <ul id="gs-workspaces-list" class="gs-sidebar-workspace-items" wicket:id="workspaceItems">
-                    <li class="gs-sidebar-item">
+                  <ul id="gs-workspaces-list" class="gs-sidebar-workspace-items">
+                    <li class="gs-sidebar-item" wicket:id="workspaceItems">
                       <button
                         wicket:id="workspaceToggle"
                         class="gs-sidebar-tree-toggle"
@@ -179,6 +206,13 @@
                             <span wicket:id="layerIcon" class="gs-layer-icon"></span>
                             <span wicket:id="layerName">layer</span>
                           </a>
+                        </li>
+                        <li class="gs-sidebar-layers-pagination-item">
+                          <div class="gs-sidebar-layers-pagination">
+                            <button class="gs-sidebar-pagination-button" type="button" disabled>Prev</button>
+                            <span class="gs-sidebar-pagination-info"></span>
+                            <button class="gs-sidebar-pagination-button" type="button" disabled>Next</button>
+                          </div>
                         </li>
                       </ul>
                     </li>
