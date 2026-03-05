@@ -164,6 +164,38 @@
                   </button>
                   <input type="submit" class="hidden" />
                 </form>
+                <div wicket:id="searchSuggestions" class="gs-sidebar-search-suggestions" hidden="hidden">
+                  <div wicket:id="workspaceSuggestionSection" class="gs-sidebar-suggestion-section">
+                    <div class="gs-sidebar-suggestion-title">Workspace</div>
+                    <ul class="gs-sidebar-suggestion-list">
+                      <li wicket:id="workspaceSuggestionItems">
+                        <button wicket:id="optionButton" type="button" class="gs-sidebar-suggestion-option">
+                          <span wicket:id="optionLabel">workspace</span>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                  <div wicket:id="layerGroupSuggestionSection" class="gs-sidebar-suggestion-section">
+                    <div class="gs-sidebar-suggestion-title">Layer groups</div>
+                    <ul class="gs-sidebar-suggestion-list">
+                      <li wicket:id="layerGroupSuggestionItems">
+                        <button wicket:id="optionButton" type="button" class="gs-sidebar-suggestion-option">
+                          <span wicket:id="optionLabel">layer group</span>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                  <div wicket:id="layerSuggestionSection" class="gs-sidebar-suggestion-section">
+                    <div class="gs-sidebar-suggestion-title">Layers</div>
+                    <ul class="gs-sidebar-suggestion-list">
+                      <li wicket:id="layerSuggestionItems">
+                        <button wicket:id="optionButton" type="button" class="gs-sidebar-suggestion-option">
+                          <span wicket:id="optionLabel">layer</span>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
                 <div class="gs-sidebar-search-status"></div>
               </div>
               <ul class="gs-sidebar-content-wrapper">
@@ -178,8 +210,13 @@
                     <span wicket:id="globalLabel" class="gs-list-name">PINNED</span>
                     <span wicket:id="globalCount" class="gs-count">0</span>
                   </div>
-                  <ul id="gs-global-list" wicket:id="globalLayers">
-                    <li><a href="#" wicket:id="layerLink"><span wicket:id="layerName">layer</span></a></li>
+                  <ul id="gs-global-list" class="gs-global-list" wicket:id="globalLayers">
+                    <li>
+                      <a class="gs-layer-link" href="#" wicket:id="layerLink">
+                        <span wicket:id="layerIcon" class="gs-layer-icon"></span>
+                        <span wicket:id="layerName">layer</span>
+                      </a>
+                    </li>
                   </ul>
                 </li>
                 <li class="gs-sidebar-item">

@@ -2147,6 +2147,46 @@ label.gs-switch-label {
   font-size: 0.75rem;
   color: var(--gs-secondary-color);
 }
+.gs-sidebar-search-suggestions {
+  position: fixed;
+  top: 11.25rem;
+  left: 11px;
+  z-index: 1000;
+  width: 16.375rem;
+  border: 1px solid var(--gs-border-color);
+  border-radius: 4px;
+  background: var(--gs-body-bg);
+  max-height: 16rem;
+  overflow: auto;
+  box-shadow: var(--gs-box-shadow-lg);
+}
+.gs-sidebar-suggestion-section + .gs-sidebar-suggestion-section {
+  border-top: 1px solid var(--gs-border-color);
+}
+.gs-sidebar-suggestion-title {
+  padding: 0.35rem 0.5rem 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gs-secondary-color);
+}
+.gs-sidebar-suggestion-list {
+  margin: 0;
+  padding: 0 0 0.25rem 0;
+  list-style: none;
+}
+.gs-sidebar-suggestion-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--gs-body-color);
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+.gs-sidebar-suggestion-option:hover {
+  background: var(--gs-secondary-bg);
+}
 
 .gs-sidebar-content-wrapper {
   margin: 0;
@@ -2293,10 +2333,12 @@ span.gs-count {
 }
 
 /* Workspace layers and icons */
-ul.gs-sidebar-workspace-layers {
+ul.gs-sidebar-workspace-layers,
+ul.gs-global-list {
   padding-left: 1.5rem;
 }
-ul.gs-sidebar-workspace-layers li a {
+ul.gs-sidebar-workspace-layers li a,
+.gs-sidebar-item ul.gs-global-list li a {
   padding: 0.25rem 0.5rem;
   display: flex;
   align-items: center;

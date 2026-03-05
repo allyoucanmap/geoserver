@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -56,6 +58,7 @@ import org.geoserver.catalog.FeatureTypeInfo;
 import org.geoserver.catalog.LayerGroupInfo;
 import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.WorkspaceInfo;
+import org.geoserver.catalog.impl.DefaultCatalogFacade;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.URLMangler;
 import org.geoserver.ows.util.ResponseUtils;
@@ -421,16 +424,126 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         add(new Label("searchScopeLabel", workspaceScopedSearch ? selectedWorkspace : "GLOBAL"));
 
         // sidebar workspace search form (filters server-side list of workspaces on submit/enter)
-        Form<Void> workspaceSearchForm = new Form<>("workspaceSearchForm");
+        Form<Void> workspaceSearchForm = new Form<>("workspaceSearchForm") {
+            @Override
+            protected void onSubmit() {
+                String searchValue = workspaceSearch;
+                if (searchValue == null) {
+                    return;
+                }
+                String workspaceName = searchValue.trim();
+                if (workspaceName.isEmpty()) {
+                    return;
+                }
+                WorkspaceInfo selected = getCatalog().getWorkspaceByName(workspaceName);
+                if (selected != null) {
+                    setResponsePage(GeoServerHomePage.class, createHomePageParams(selected.getName(), null));
+                }
+            }
+        };
         workspaceSearchForm.setOutputMarkupId(true);
-        TextField<String> workspaceSearchField =
+        final TextField<String> workspaceSearchField =
                 new TextField<>("workspaceSearch", new PropertyModel<>(this, "workspaceSearch"));
         workspaceSearchField.add(AttributeModifier.replace(
                 "placeholder",
                 workspaceScopedSearch
                         ? "Search layers and layer groups..."
                         : "Search workspace, layers and layer groups..."));
+        workspaceSearchField.add(new AjaxFormComponentUpdatingBehavior("change") {
+            @Override
+            protected void onUpdate(AjaxRequestTarget target) {
+                String searchValue = workspaceSearchField.getModelObject();
+                if (searchValue == null || searchValue.isBlank()) {
+                    return;
+                }
+                String workspaceName = searchValue.trim();
+                WorkspaceInfo selected = getCatalog().getWorkspaceByName(Objects.requireNonNull(workspaceName));
+                if (selected != null) {
+                    setResponsePage(GeoServerHomePage.class, createHomePageParams(selected.getName(), null));
+                }
+            }
+        });
         workspaceSearchForm.add(workspaceSearchField);
+        WebMarkupContainer searchSuggestions = new WebMarkupContainer("searchSuggestions");
+        searchSuggestions.setOutputMarkupPlaceholderTag(true);
+        add(searchSuggestions);
+
+        LoadableDetachableModel<List<String>> workspaceSuggestions = new LoadableDetachableModel<>() {
+            @Override
+            protected List<String> load() {
+                return loadWorkspaceSuggestionNames();
+            }
+        };
+        LoadableDetachableModel<List<String>> layerGroupSuggestions = new LoadableDetachableModel<>() {
+            @Override
+            protected List<String> load() {
+                return loadLayerGroupSuggestionNames(getSelectedWorkspaceName());
+            }
+        };
+        LoadableDetachableModel<List<String>> layerSuggestions = new LoadableDetachableModel<>() {
+            @Override
+            protected List<String> load() {
+                return loadLayerSuggestionNames(getSelectedWorkspaceName());
+            }
+        };
+
+        WebMarkupContainer workspaceSuggestionSection = new WebMarkupContainer("workspaceSuggestionSection") {
+            @Override
+            protected void onConfigure() {
+                super.onConfigure();
+                setVisible(!workspaceScopedSearch
+                        && !workspaceSuggestions.getObject().isEmpty());
+            }
+        };
+        searchSuggestions.add(workspaceSuggestionSection);
+        workspaceSuggestionSection.add(new ListView<>("workspaceSuggestionItems", workspaceSuggestions) {
+            @Override
+            protected void populateItem(ListItem<String> item) {
+                String option = Objects.requireNonNullElse(item.getModelObject(), "");
+                WebMarkupContainer optionButton = new WebMarkupContainer("optionButton");
+                optionButton.add(AttributeModifier.replace("data-value", option));
+                optionButton.add(new Label("optionLabel", option));
+                item.add(optionButton);
+            }
+        });
+
+        WebMarkupContainer layerGroupSuggestionSection = new WebMarkupContainer("layerGroupSuggestionSection") {
+            @Override
+            protected void onConfigure() {
+                super.onConfigure();
+                setVisible(!layerGroupSuggestions.getObject().isEmpty());
+            }
+        };
+        searchSuggestions.add(layerGroupSuggestionSection);
+        layerGroupSuggestionSection.add(new ListView<>("layerGroupSuggestionItems", layerGroupSuggestions) {
+            @Override
+            protected void populateItem(ListItem<String> item) {
+                String option = Objects.requireNonNullElse(item.getModelObject(), "");
+                WebMarkupContainer optionButton = new WebMarkupContainer("optionButton");
+                optionButton.add(AttributeModifier.replace("data-value", option));
+                optionButton.add(new Label("optionLabel", option));
+                item.add(optionButton);
+            }
+        });
+
+        WebMarkupContainer layerSuggestionSection = new WebMarkupContainer("layerSuggestionSection") {
+            @Override
+            protected void onConfigure() {
+                super.onConfigure();
+                setVisible(!layerSuggestions.getObject().isEmpty());
+            }
+        };
+        searchSuggestions.add(layerSuggestionSection);
+        layerSuggestionSection.add(new ListView<>("layerSuggestionItems", layerSuggestions) {
+            @Override
+            protected void populateItem(ListItem<String> item) {
+                String option = Objects.requireNonNullElse(item.getModelObject(), "");
+                WebMarkupContainer optionButton = new WebMarkupContainer("optionButton");
+                optionButton.add(AttributeModifier.replace("data-value", option));
+                optionButton.add(new Label("optionLabel", option));
+                item.add(optionButton);
+            }
+        });
         add(workspaceSearchForm);
 
         // sidebar tree content (global/workspaces and layer lists)
@@ -463,7 +576,8 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
                         globalIcon.setVisible(entry.getKind() == BreadcrumbKind.GLOBAL);
                         workspaceIcon.setVisible(entry.getKind() == BreadcrumbKind.WORKSPACE);
-                        breadcrumbLayerIcon.setVisible(entry.getKind() == BreadcrumbKind.LAYER);
+                        breadcrumbLayerIcon.setVisible(entry.getKind() == BreadcrumbKind.LAYER
+                                || entry.getKind() == BreadcrumbKind.LAYER_GROUP);
 
                         if (entry.getKind() == BreadcrumbKind.LAYER) {
                             // Reuse the same icon logic as the sidebar, based on selected layer type
@@ -478,6 +592,10 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                             if (!iconVariant.isEmpty()) {
                                 breadcrumbLayerIcon.add(AttributeModifier.append("class", iconVariant));
                             }
+                        }
+                        if (entry.getKind() == BreadcrumbKind.LAYER_GROUP) {
+                            String iconVariant = getLayerGroupIconCssClass();
+                            breadcrumbLayerIcon.add(AttributeModifier.append("class", iconVariant));
                         }
 
                         breadcrumbLink.add(globalIcon);
@@ -496,7 +614,8 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
                         currentGlobalIcon.setVisible(entry.getKind() == BreadcrumbKind.GLOBAL);
                         currentWorkspaceIcon.setVisible(entry.getKind() == BreadcrumbKind.WORKSPACE);
-                        currentLayerIcon.setVisible(entry.getKind() == BreadcrumbKind.LAYER);
+                        currentLayerIcon.setVisible(entry.getKind() == BreadcrumbKind.LAYER
+                                || entry.getKind() == BreadcrumbKind.LAYER_GROUP);
 
                         if (entry.getKind() == BreadcrumbKind.LAYER) {
                             LayerInfo layerInfo = null;
@@ -510,6 +629,10 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                             if (!iconVariant.isEmpty()) {
                                 currentLayerIcon.add(AttributeModifier.append("class", iconVariant));
                             }
+                        }
+                        if (entry.getKind() == BreadcrumbKind.LAYER_GROUP) {
+                            String iconVariant = getLayerGroupIconCssClass();
+                            currentLayerIcon.add(AttributeModifier.append("class", iconVariant));
                         }
 
                         breadcrumbCurrent.add(currentGlobalIcon);
@@ -573,19 +696,14 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         globalToggle.add(new Label("globalCount", new LoadableDetachableModel<Integer>() {
             @Override
             protected Integer load() {
-                return loadGlobalLayerNames().size();
+                return loadGlobalPublishedEntries().size();
             }
         }));
         add(globalToggle);
 
         WebMarkupContainer pinnedSectionHeading = new WebMarkupContainer("pinnedSectionHeading");
         pinnedSectionHeading.add(new Label("pinnedLabel", "PINNED"));
-        pinnedSectionHeading.add(new Label("pinnedCount", new LoadableDetachableModel<Integer>() {
-            @Override
-            protected Integer load() {
-                return loadPinnedLayerNames().size();
-            }
-        }));
+        pinnedSectionHeading.add(new Label("pinnedCount", 0));
         add(pinnedSectionHeading);
 
         WebMarkupContainer workspacesToggle = new WebMarkupContainer("workspacesToggle");
@@ -593,23 +711,31 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         workspacesToggle.add(new Label("workspacesCount", new LoadableDetachableModel<Integer>() {
             @Override
             protected Integer load() {
-                return getCatalog().getWorkspaces().size();
+                return loadWorkspaceEntries().size();
             }
         }));
         add(workspacesToggle);
 
         add(
-                new ListView<>("globalLayers", new LoadableDetachableModel<List<String>>() {
+                new ListView<>("globalLayers", new LoadableDetachableModel<List<SidebarPublishedEntry>>() {
                     @Override
-                    protected List<String> load() {
-                        return loadGlobalLayerNames();
+                    protected List<SidebarPublishedEntry> load() {
+                        return loadGlobalPublishedEntries();
                     }
                 }) {
                     @Override
-                    protected void populateItem(ListItem<String> item) {
-                        BookmarkablePageLink<LayerPage> link = new BookmarkablePageLink<>("layerLink", LayerPage.class);
-                        link.add(new Label("layerName", item.getModel()));
-                        if (selectedLayer != null && selectedLayer.equals(item.getModelObject())) {
+                    protected void populateItem(ListItem<SidebarPublishedEntry> item) {
+                        SidebarPublishedEntry published = item.getModelObject();
+                        BookmarkablePageLink<GeoServerHomePage> link = new BookmarkablePageLink<>(
+                                "layerLink", GeoServerHomePage.class, createHomePageParams(null, published.getName()));
+                        WebMarkupContainer layerIcon = new WebMarkupContainer("layerIcon");
+                        String iconVariant = published.getIconCssClass();
+                        if (!iconVariant.isEmpty()) {
+                            layerIcon.add(AttributeModifier.append("class", iconVariant));
+                        }
+                        link.add(layerIcon);
+                        link.add(new Label("layerName", published.getName()));
+                        if (selectedLayer != null && selectedLayer.equals(published.getName())) {
                             link.add(AttributeModifier.append("class", "is-active"));
                         }
                         item.add(link);
@@ -692,16 +818,21 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         return params;
     }
 
-    private List<String> loadGlobalLayerNames() {
-        List<String> names = new ArrayList<>();
+    private List<SidebarPublishedEntry> loadGlobalPublishedEntries() {
+        List<SidebarPublishedEntry> entries = new ArrayList<>();
         for (LayerInfo layer : loadAllLayers()) {
             String prefixed = layer.prefixedName();
             if (!prefixed.contains(":")) {
-                names.add(prefixed);
+                entries.add(new SidebarPublishedEntry(layer.getName(), getLayerIconCssClass(layer)));
             }
         }
-        Collections.sort(names);
-        return names;
+        for (LayerGroupInfo group : getCatalog().getLayerGroups()) {
+            if (group.getWorkspace() == null) {
+                entries.add(new SidebarPublishedEntry(group.getName(), getLayerGroupIconCssClass()));
+            }
+        }
+        entries.sort((left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+        return entries;
     }
 
     private List<String> loadPinnedLayerNames() {
@@ -720,22 +851,58 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
     private List<SidebarWorkspaceEntry> loadWorkspaceEntries() {
         Catalog catalog = getCatalog();
         List<WorkspaceInfo> workspaces = new ArrayList<>(catalog.getWorkspaces());
-        String query = workspaceSearch;
-        if (query != null && !query.isBlank()) {
-            String lowered = query.toLowerCase(Locale.ROOT);
-            workspaces.removeIf(ws -> ws.getName() == null
-                    || !ws.getName().toLowerCase(Locale.ROOT).contains(lowered));
+        String selectedWorkspace = getSelectedWorkspaceName();
+        if (selectedWorkspace != null && !selectedWorkspace.isBlank()) {
+            workspaces.removeIf(ws -> ws.getName() == null || !selectedWorkspace.equals(ws.getName()));
         }
         workspaces.sort((left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+
+        String query = workspaceSearch;
+        String loweredQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        boolean hasQuery = !loweredQuery.isEmpty();
+        boolean workspaceScoped = selectedWorkspace != null && !selectedWorkspace.isBlank();
 
         List<SidebarWorkspaceEntry> entries = new ArrayList<>(workspaces.size());
         for (int i = 0; i < workspaces.size(); i++) {
             WorkspaceInfo workspace = workspaces.get(i);
-            List<SidebarPublishedEntry> publishedEntries = loadWorkspacePublishedEntries(workspace);
+            String workspaceName = workspace.getName();
+            List<SidebarPublishedEntry> allPublishedEntries = loadWorkspacePublishedEntries(workspace);
+            List<SidebarPublishedEntry> publishedEntries = allPublishedEntries;
+
+            if (hasQuery) {
+                if (workspaceScoped) {
+                    // Workspace page: keep selected workspace visible, filter only child results.
+                    publishedEntries = filterPublishedEntries(allPublishedEntries, loweredQuery);
+                } else {
+                    boolean workspaceMatches = workspaceName != null
+                            && workspaceName.toLowerCase(Locale.ROOT).contains(loweredQuery);
+                    if (!workspaceMatches) {
+                        // Main page: if workspace doesn't match, include only matching child results.
+                        publishedEntries = filterPublishedEntries(allPublishedEntries, loweredQuery);
+                        if (publishedEntries.isEmpty()) {
+                            continue;
+                        }
+                    }
+                    // If workspace matches, show whole workspace with all children.
+                }
+            }
+
             entries.add(new SidebarWorkspaceEntry(workspace.getName(), "gs-workspace-layers-" + i, publishedEntries));
         }
 
         return entries;
+    }
+
+    private List<SidebarPublishedEntry> filterPublishedEntries(
+            List<SidebarPublishedEntry> entries, String loweredQuery) {
+        List<SidebarPublishedEntry> filtered = new ArrayList<>();
+        for (SidebarPublishedEntry entry : entries) {
+            String name = entry.getName();
+            if (name != null && name.toLowerCase(Locale.ROOT).contains(loweredQuery)) {
+                filtered.add(entry);
+            }
+        }
+        return filtered;
     }
 
     private List<SidebarPublishedEntry> loadWorkspacePublishedEntries(WorkspaceInfo workspace) {
@@ -790,6 +957,57 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         return "gs-layer-icon--group";
     }
 
+    private List<String> loadWorkspaceSuggestionNames() {
+        Set<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (WorkspaceInfo ws : getCatalog().getWorkspaces()) {
+            if (ws.getName() != null && !ws.getName().isBlank()) {
+                names.add(ws.getName());
+            }
+        }
+        return new ArrayList<>(names);
+    }
+
+    private List<String> loadLayerSuggestionNames(String selectedWorkspace) {
+        Set<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (LayerInfo layer : loadAllLayers()) {
+            if (layer.getName() == null || layer.getName().isBlank()) {
+                continue;
+            }
+            if (selectedWorkspace != null && !selectedWorkspace.isBlank()) {
+                String prefixed = layer.prefixedName();
+                String prefix = selectedWorkspace + ":";
+                if (prefixed.startsWith(prefix)) {
+                    names.add(layer.getName());
+                }
+            } else {
+                names.add(layer.getName());
+            }
+        }
+        return new ArrayList<>(names);
+    }
+
+    private List<String> loadLayerGroupSuggestionNames(String selectedWorkspace) {
+        Set<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        if (selectedWorkspace != null && !selectedWorkspace.isBlank()) {
+            WorkspaceInfo workspace = getCatalog().getWorkspaceByName(selectedWorkspace);
+            if (workspace != null) {
+                for (LayerGroupInfo group : getCatalog().getLayerGroupsByWorkspace(workspace)) {
+                    if (group.getName() != null && !group.getName().isBlank()) {
+                        names.add(group.getName());
+                    }
+                }
+            }
+        } else {
+            for (LayerGroupInfo group : getCatalog().getLayerGroups()) {
+                if (group.getName() == null || group.getName().isBlank()) {
+                    continue;
+                }
+                names.add(group.getName());
+            }
+        }
+        return new ArrayList<>(names);
+    }
+
     private List<LayerInfo> loadAllLayers() {
         return new ArrayList<>(getCatalog().getLayers());
     }
@@ -797,6 +1015,7 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
     private List<BreadcrumbEntry> loadBreadcrumbEntries() {
         String selectedWorkspace = getSelectedWorkspaceName();
         String selectedLayer = getSelectedLayerName();
+        boolean selectedIsLayerGroup = isSelectedLayerGroup(selectedWorkspace, selectedLayer);
 
         List<BreadcrumbEntry> entries = new ArrayList<>();
         boolean globalCurrent = selectedWorkspace == null && selectedLayer == null;
@@ -821,7 +1040,11 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             }
             layerParams.add("layer", selectedLayer);
             String layerUrl = urlFor(GeoServerHomePage.class, layerParams).toString();
-            entries.add(new BreadcrumbEntry(selectedLayer, layerUrl, true, BreadcrumbKind.LAYER));
+            entries.add(new BreadcrumbEntry(
+                    selectedLayer,
+                    layerUrl,
+                    true,
+                    selectedIsLayerGroup ? BreadcrumbKind.LAYER_GROUP : BreadcrumbKind.LAYER));
         }
 
         return entries.stream().filter(Objects::nonNull).collect(Collectors.toList());
@@ -872,6 +1095,28 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             return selectedLayer.substring(selectedLayer.indexOf(':') + 1);
         }
         return selectedLayer;
+    }
+
+    private boolean isSelectedLayerGroup(String selectedWorkspace, String selectedLayer) {
+        if (selectedLayer == null || selectedLayer.isBlank()) {
+            return false;
+        }
+        Catalog catalog = getCatalog();
+        if (selectedWorkspace != null && !selectedWorkspace.isBlank()) {
+            WorkspaceInfo workspace = catalog.getWorkspaceByName(selectedWorkspace);
+            if (workspace != null && catalog.getLayerGroupByName(workspace, selectedLayer) != null) {
+                return true;
+            }
+        }
+        if (catalog.getLayerGroupByName(Objects.requireNonNull(DefaultCatalogFacade.NO_WORKSPACE), selectedLayer)
+                != null) {
+            return true;
+        }
+        if (catalog.getLayerGroupByName(Objects.requireNonNull(DefaultCatalogFacade.ANY_WORKSPACE), selectedLayer)
+                != null) {
+            return true;
+        }
+        return false;
     }
 
     private String buildBreadcrumbOptionUrl(BreadcrumbOption option, String selectedWorkspace, String selectedLayer) {
@@ -966,7 +1211,8 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
     private enum BreadcrumbKind {
         GLOBAL,
         WORKSPACE,
-        LAYER
+        LAYER,
+        LAYER_GROUP
     }
 
     private static class BreadcrumbEntry {

@@ -157,6 +157,85 @@
         }
         initializeSidebarWorkspaceSearchClear();
 
+        // Sidebar grouped search suggestions
+        function initializeSidebarSearchSuggestions() {
+            const searchForm = document.querySelector('.gs-sidebar-search-box');
+            const searchInput = searchForm && searchForm.querySelector('.gs-sidebar-search-input');
+            const suggestions = document.querySelector('.gs-sidebar-search-suggestions');
+            if (!searchForm || !searchInput || !suggestions) return;
+
+            const sections = Array.prototype.slice.call(
+                suggestions.querySelectorAll('.gs-sidebar-suggestion-section')
+            );
+            const options = Array.prototype.slice.call(
+                suggestions.querySelectorAll('.gs-sidebar-suggestion-option')
+            );
+
+            function updateSuggestions() {
+                const query = (searchInput.value || '').trim().toLowerCase();
+                let anyVisible = false;
+
+                sections.forEach(function(section) {
+                    const items = Array.prototype.slice.call(section.querySelectorAll('li'));
+                    let visibleCount = 0;
+
+                    items.forEach(function(item) {
+                        const button = item.querySelector('.gs-sidebar-suggestion-option');
+                        if (!button) return;
+                        const value = (button.getAttribute('data-value') || '').toLowerCase();
+                        const visible = !query || value.indexOf(query) !== -1;
+                        if (visible) {
+                            item.style.display = '';
+                            item.removeAttribute('hidden');
+                            visibleCount++;
+                        } else {
+                            item.style.display = 'none';
+                            item.setAttribute('hidden', 'hidden');
+                        }
+                    });
+
+                    if (visibleCount > 0) {
+                        section.style.display = '';
+                        section.removeAttribute('hidden');
+                        anyVisible = true;
+                    } else {
+                        section.style.display = 'none';
+                        section.setAttribute('hidden', 'hidden');
+                    }
+                });
+
+                if (anyVisible) {
+                    suggestions.removeAttribute('hidden');
+                } else {
+                    suggestions.setAttribute('hidden', 'hidden');
+                }
+            }
+
+            searchInput.addEventListener('focus', updateSuggestions);
+            searchInput.addEventListener('input', updateSuggestions);
+
+            options.forEach(function(option) {
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const value = option.getAttribute('data-value') || '';
+                    searchInput.value = value;
+                    suggestions.setAttribute('hidden', 'hidden');
+                    if (typeof searchForm.requestSubmit === 'function') {
+                        searchForm.requestSubmit();
+                    } else {
+                        searchForm.submit();
+                    }
+                });
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!searchForm.contains(e.target) && !suggestions.contains(e.target)) {
+                    suggestions.setAttribute('hidden', 'hidden');
+                }
+            });
+        }
+        initializeSidebarSearchSuggestions();
+
         // Sidebar workspace pagination for workspace
         function initializeSidebarWorkspacePagination() {
             const workspaceList = document.getElementById('gs-workspaces-list');
@@ -174,6 +253,7 @@
                 workspaceList.querySelectorAll(':scope > .gs-sidebar-item')
             );
             if (!items.length) {
+                pagination.setAttribute('hidden', 'hidden');
                 pageInfo.textContent = '0/0';
                 prevButton.disabled = true;
                 nextButton.disabled = true;
@@ -181,6 +261,11 @@
             }
 
             const totalPages = Math.ceil(items.length / pageSize);
+            if (totalPages <= 1) {
+                pagination.setAttribute('hidden', 'hidden');
+            } else {
+                pagination.removeAttribute('hidden');
+            }
             let currentPage = 1;
 
             function renderPage() {
@@ -244,6 +329,7 @@
                 );
 
                 if (!items.length) {
+                    pagination.setAttribute('hidden', 'hidden');
                     pageInfo.textContent = '0/0';
                     prevButton.disabled = true;
                     nextButton.disabled = true;
@@ -251,6 +337,11 @@
                 }
 
                 const totalPages = Math.ceil(items.length / pageSize);
+                if (totalPages <= 1) {
+                    pagination.setAttribute('hidden', 'hidden');
+                } else {
+                    pagination.removeAttribute('hidden');
+                }
                 let currentPage = 1;
 
                 function renderPage() {
