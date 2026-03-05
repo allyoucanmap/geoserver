@@ -466,11 +466,14 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         workspaceSearchForm.add(workspaceSearchField);
         WebMarkupContainer searchSuggestions = new WebMarkupContainer("searchSuggestions");
         searchSuggestions.setOutputMarkupPlaceholderTag(true);
-        add(searchSuggestions);
+        workspaceSearchForm.add(searchSuggestions);
 
         LoadableDetachableModel<List<String>> workspaceSuggestions = new LoadableDetachableModel<>() {
             @Override
             protected List<String> load() {
+                if (workspaceScopedSearch) {
+                    return new ArrayList<>();
+                }
                 return loadWorkspaceSuggestionNames();
             }
         };
@@ -487,16 +490,7 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             }
         };
 
-        WebMarkupContainer workspaceSuggestionSection = new WebMarkupContainer("workspaceSuggestionSection") {
-            @Override
-            protected void onConfigure() {
-                super.onConfigure();
-                setVisible(!workspaceScopedSearch
-                        && !workspaceSuggestions.getObject().isEmpty());
-            }
-        };
-        searchSuggestions.add(workspaceSuggestionSection);
-        workspaceSuggestionSection.add(new ListView<>("workspaceSuggestionItems", workspaceSuggestions) {
+        searchSuggestions.add(new ListView<>("workspaceSuggestionItems", workspaceSuggestions) {
             @Override
             protected void populateItem(ListItem<String> item) {
                 String option = Objects.requireNonNullElse(item.getModelObject(), "");
@@ -507,15 +501,7 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             }
         });
 
-        WebMarkupContainer layerGroupSuggestionSection = new WebMarkupContainer("layerGroupSuggestionSection") {
-            @Override
-            protected void onConfigure() {
-                super.onConfigure();
-                setVisible(!layerGroupSuggestions.getObject().isEmpty());
-            }
-        };
-        searchSuggestions.add(layerGroupSuggestionSection);
-        layerGroupSuggestionSection.add(new ListView<>("layerGroupSuggestionItems", layerGroupSuggestions) {
+        searchSuggestions.add(new ListView<>("layerGroupSuggestionItems", layerGroupSuggestions) {
             @Override
             protected void populateItem(ListItem<String> item) {
                 String option = Objects.requireNonNullElse(item.getModelObject(), "");
@@ -526,20 +512,18 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             }
         });
 
-        WebMarkupContainer layerSuggestionSection = new WebMarkupContainer("layerSuggestionSection") {
-            @Override
-            protected void onConfigure() {
-                super.onConfigure();
-                setVisible(!layerSuggestions.getObject().isEmpty());
-            }
-        };
-        searchSuggestions.add(layerSuggestionSection);
-        layerSuggestionSection.add(new ListView<>("layerSuggestionItems", layerSuggestions) {
+        searchSuggestions.add(new ListView<>("layerSuggestionItems", layerSuggestions) {
             @Override
             protected void populateItem(ListItem<String> item) {
                 String option = Objects.requireNonNullElse(item.getModelObject(), "");
                 WebMarkupContainer optionButton = new WebMarkupContainer("optionButton");
                 optionButton.add(AttributeModifier.replace("data-value", option));
+                WebMarkupContainer icon = new WebMarkupContainer("optionIcon");
+                String iconCss = getLayerSuggestionIconCss(getSelectedWorkspaceName(), option);
+                if (!iconCss.isEmpty()) {
+                    icon.add(AttributeModifier.append("class", iconCss));
+                }
+                optionButton.add(icon);
                 optionButton.add(new Label("optionLabel", option));
                 item.add(optionButton);
             }
@@ -984,6 +968,30 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             }
         }
         return new ArrayList<>(names);
+    }
+
+    private String getLayerSuggestionIconCss(String selectedWorkspace, String layerName) {
+        if (layerName == null || layerName.isBlank()) {
+            return "";
+        }
+        LayerInfo target = null;
+        for (LayerInfo layer : loadAllLayers()) {
+            if (layer.getName() == null) {
+                continue;
+            }
+            if (selectedWorkspace != null && !selectedWorkspace.isBlank()) {
+                String prefixed = layer.prefixedName();
+                String prefix = selectedWorkspace + ":";
+                if (prefixed.startsWith(prefix) && layerName.equals(layer.getName())) {
+                    target = layer;
+                    break;
+                }
+            } else if (layerName.equals(layer.getName())) {
+                target = layer;
+                break;
+            }
+        }
+        return getLayerIconCssClass(target);
     }
 
     private List<String> loadLayerGroupSuggestionNames(String selectedWorkspace) {

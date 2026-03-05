@@ -164,43 +164,37 @@
             const suggestions = document.querySelector('.gs-sidebar-search-suggestions');
             if (!searchForm || !searchInput || !suggestions) return;
 
-            const sections = Array.prototype.slice.call(
-                suggestions.querySelectorAll('.gs-sidebar-suggestion-section')
-            );
             const options = Array.prototype.slice.call(
                 suggestions.querySelectorAll('.gs-sidebar-suggestion-option')
+            );
+            const optionItems = Array.prototype.slice.call(
+                suggestions.querySelectorAll('.gs-sidebar-suggestion-list > li')
             );
 
             function updateSuggestions() {
                 const query = (searchInput.value || '').trim().toLowerCase();
+                if (!query) {
+                    suggestions.setAttribute('hidden', 'hidden');
+                    optionItems.forEach(function(item) {
+                        item.style.display = '';
+                        item.removeAttribute('hidden');
+                    });
+                    return;
+                }
                 let anyVisible = false;
 
-                sections.forEach(function(section) {
-                    const items = Array.prototype.slice.call(section.querySelectorAll('li'));
-                    let visibleCount = 0;
-
-                    items.forEach(function(item) {
-                        const button = item.querySelector('.gs-sidebar-suggestion-option');
-                        if (!button) return;
-                        const value = (button.getAttribute('data-value') || '').toLowerCase();
-                        const visible = !query || value.indexOf(query) !== -1;
-                        if (visible) {
-                            item.style.display = '';
-                            item.removeAttribute('hidden');
-                            visibleCount++;
-                        } else {
-                            item.style.display = 'none';
-                            item.setAttribute('hidden', 'hidden');
-                        }
-                    });
-
-                    if (visibleCount > 0) {
-                        section.style.display = '';
-                        section.removeAttribute('hidden');
+                optionItems.forEach(function(item) {
+                    const button = item.querySelector('.gs-sidebar-suggestion-option');
+                    if (!button) return;
+                    const value = (button.getAttribute('data-value') || '').toLowerCase();
+                    const visible = value.indexOf(query) !== -1;
+                    if (visible) {
+                        item.style.display = '';
+                        item.removeAttribute('hidden');
                         anyVisible = true;
                     } else {
-                        section.style.display = 'none';
-                        section.setAttribute('hidden', 'hidden');
+                        item.style.display = 'none';
+                        item.setAttribute('hidden', 'hidden');
                     }
                 });
 
@@ -211,7 +205,6 @@
                 }
             }
 
-            searchInput.addEventListener('focus', updateSuggestions);
             searchInput.addEventListener('input', updateSuggestions);
 
             options.forEach(function(option) {
@@ -388,6 +381,15 @@
             const toggles = document.querySelectorAll('.gs-sidebar-tree-toggle');
             if (!toggles.length) return;
 
+            // Determine selected workspace from URL (?workspace=...)
+            let selectedWorkspace = null;
+            try {
+                const params = new URLSearchParams(window.location.search);
+                selectedWorkspace = params.get('workspace');
+            } catch (e) {
+                selectedWorkspace = null;
+            }
+
             toggles.forEach(function(toggle) {
                 const controlsId = toggle.getAttribute('aria-controls');
                 if (!controlsId) return;
@@ -410,6 +412,18 @@
 
                 function isOpen() {
                     return !list.hasAttribute('hidden');
+                }
+
+                // If URL has a selected workspace, auto-open its list
+                if (selectedWorkspace) {
+                    const workspaceLink = toggle.querySelector('.gs-sidebar-workspace-link');
+                    const workspaceName = workspaceLink && workspaceLink.textContent
+                        ? workspaceLink.textContent.trim()
+                        : null;
+                    if (workspaceName && workspaceName === selectedWorkspace) {
+                        openList();
+                        toggle.classList.add('is-active');
+                    }
                 }
 
                 toggle.setAttribute('aria-expanded', isOpen() ? 'true' : 'false');

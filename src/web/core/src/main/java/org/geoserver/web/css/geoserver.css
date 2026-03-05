@@ -2100,8 +2100,6 @@ label.gs-switch-label {
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.75rem;
-  padding-bottom: 0;
-  border-bottom: 1px solid var(--gs-border-color);
 }
 .gs-sidebar-search-title {
   display: flex;
@@ -2119,6 +2117,7 @@ label.gs-switch-label {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  position: relative;
 }
 .gs-sidebar-search-clear {
   display: none;
@@ -2148,9 +2147,9 @@ label.gs-switch-label {
   color: var(--gs-secondary-color);
 }
 .gs-sidebar-search-suggestions {
-  position: fixed;
-  top: 11.25rem;
-  left: 11px;
+  position: absolute;
+  top: 100%;
+  left: 0;
   z-index: 1000;
   width: 16.375rem;
   border: 1px solid var(--gs-border-color);
@@ -2160,29 +2159,18 @@ label.gs-switch-label {
   overflow: auto;
   box-shadow: var(--gs-box-shadow-lg);
 }
-.gs-sidebar-suggestion-section + .gs-sidebar-suggestion-section {
-  border-top: 1px solid var(--gs-border-color);
-}
-.gs-sidebar-suggestion-title {
-  padding: 0.35rem 0.5rem 0.15rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--gs-secondary-color);
-}
 .gs-sidebar-suggestion-list {
   margin: 0;
-  padding: 0 0 0.25rem 0;
+  padding: 0;
   list-style: none;
 }
 .gs-sidebar-suggestion-option {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   width: 100%;
   border: 0;
-  background: transparent;
-  text-align: left;
-  color: var(--gs-body-color);
-  padding: 0.25rem 0.5rem;
-  cursor: pointer;
+  font-size: 0.875rem;
 }
 .gs-sidebar-suggestion-option:hover {
   background: var(--gs-secondary-bg);
@@ -2377,6 +2365,7 @@ ul.gs-sidebar-workspace-layers li a,
   position: relative;
   font-size: 0.875em;
   padding: 0.75rem;
+  padding-top: 0;
   padding-bottom: 0;
 }
 .gs-sidebar-new-button {
