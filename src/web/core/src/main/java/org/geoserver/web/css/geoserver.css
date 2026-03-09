@@ -2385,6 +2385,7 @@ ul.gs-sidebar-workspace-layers li a,
   min-width: 12em;
   margin-bottom: 0;
   margin-top: 0.25rem;
+  z-index: 100;
 }
 .gs-sidebar-new-menu.hidden {
   display: none;

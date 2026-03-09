@@ -47,6 +47,7 @@ import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.StringResourceModel;
+import org.apache.wicket.request.Url;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.request.mapper.parameter.INamedParameters.Type;
@@ -69,6 +70,7 @@ import org.geoserver.security.config.SecurityManagerConfig;
 import org.geoserver.web.data.layer.LayerPage;
 import org.geoserver.web.data.layer.NewLayerPage;
 import org.geoserver.web.data.layergroup.LayerGroupEditPage;
+import org.geoserver.web.data.layergroup.LayerGroupPage;
 import org.geoserver.web.data.resource.ResourceConfigurationPage;
 import org.geoserver.web.data.store.NewDataPage;
 import org.geoserver.web.data.store.StorePage;
@@ -445,10 +447,7 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         final TextField<String> workspaceSearchField =
                 new TextField<>("workspaceSearch", new PropertyModel<>(this, "workspaceSearch"));
         workspaceSearchField.add(AttributeModifier.replace(
-                "placeholder",
-                workspaceScopedSearch
-                        ? "Search layers and layer groups..."
-                        : "Search workspace, layers and layer groups..."));
+                "placeholder", workspaceScopedSearch ? "Search layers..." : "Search workspace and layers..."));
         workspaceSearchField.add(new AjaxFormComponentUpdatingBehavior("change") {
             @Override
             protected void onUpdate(AjaxRequestTarget target) {
@@ -537,6 +536,8 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
     private void initializeSidebarContent() {
         final String selectedWorkspace = getSelectedWorkspaceName();
         final String selectedLayer = getSelectedLayerName();
+        final Authentication user = GeoServerSession.get().getAuthentication();
+        final boolean anonymous = user == null || user instanceof AnonymousAuthenticationToken;
 
         add(
                 new ListView<>("breadcrumbItems", new LoadableDetachableModel<List<BreadcrumbEntry>>() {
@@ -626,10 +627,28 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
                         List<BreadcrumbOption> options = Collections.emptyList();
                         if (entry.isCurrent() && !renderCurrentAsLink) {
-                            if (selectedLayer != null) {
-                                options = LAYER_BREADCRUMB_OPTIONS;
-                            } else if (selectedWorkspace != null) {
-                                options = WORKSPACE_BREADCRUMB_OPTIONS;
+                            if (anonymous) {
+                                if (selectedLayer != null) {
+                                    LayerGroupInfo layerGroup = getCatalog().getLayerGroupByName(selectedLayer);
+                                    if (layerGroup != null) {
+                                        options = ANONYMOUS_LAYER_GROUP_BREADCRUMB_OPTIONS;
+                                    } else {
+                                        options = ANONYMOUS_LAYER_BREADCRUMB_OPTIONS;
+                                    }
+                                } else if (selectedWorkspace != null) {
+                                    options = ANONYMOUS_WORKSPACE_BREADCRUMB_OPTIONS;
+                                }
+                            } else {
+                                if (selectedLayer != null) {
+                                    LayerGroupInfo layerGroup = getCatalog().getLayerGroupByName(selectedLayer);
+                                    if (layerGroup != null) {
+                                        options = LAYER_GROUP_BREADCRUMB_OPTIONS;
+                                    } else {
+                                        options = LAYER_BREADCRUMB_OPTIONS;
+                                    }
+                                } else if (selectedWorkspace != null) {
+                                    options = WORKSPACE_BREADCRUMB_OPTIONS;
+                                }
                             }
                         }
 
@@ -1141,10 +1160,53 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
             PageParameters params = new PageParameters();
 
-            if ("workspace.data.allLayers".equals(action)) {
+            if ("workspace.data.layers".equals(action)) {
                 params.add("workspace", selectedWorkspace);
                 return urlFor(LayerPage.class, params).toString();
             }
+
+            if ("workspace.data.layerGroups".equals(action)) {
+                params.add("workspace", selectedWorkspace);
+                return urlFor(LayerGroupPage.class, params).toString();
+            }
+
+            if ("workspace.data.layersPreview".equals(action)) {
+                String basePath = RequestCycle.get()
+                        .getUrlRenderer()
+                        .renderContextRelativeUrl("wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage");
+                Url url = Url.parse(basePath);
+                if (selectedWorkspace != null) {
+                    url.setQueryParameter("workspace", selectedWorkspace);
+                }
+                return RequestCycle.get().getUrlRenderer().renderFullUrl(url);
+            }
+
+            if ("workspace.data.styles".equals(action)) {
+                String basePath = RequestCycle.get()
+                        .getUrlRenderer()
+                        .renderContextRelativeUrl("wicket/bookmarkable/org.geoserver.wms.web.data.StylePage");
+                Url url = Url.parse(basePath);
+                if (selectedWorkspace != null) {
+                    url.setQueryParameter("workspace", selectedWorkspace);
+                }
+                return RequestCycle.get().getUrlRenderer().renderFullUrl(url);
+            }
+
+            if ("workspace.tileLayers".equals(action)) {
+                String basePath = RequestCycle.get()
+                        .getUrlRenderer()
+                        .renderContextRelativeUrl("wicket/bookmarkable/org.geoserver.gwc.web.layer.CachedLayersPage");
+                Url url = Url.parse(basePath);
+                if (selectedWorkspace != null) {
+                    url.setQueryParameter("workspace", selectedWorkspace);
+                }
+                return RequestCycle.get().getUrlRenderer().renderFullUrl(url);
+            }
+
+            // if ("workspace.data.layerGroups".equals(action)) {
+            //     params.add("workspace", selectedWorkspace);
+            //     return urlFor(MapPreviewPage.class, params).toString();
+            // }
 
             if ("workspace.data.stores".equals(action)) {
                 params.add("workspace", selectedWorkspace);
@@ -1161,6 +1223,16 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             if (selectedLayer == null) {
                 return "#";
             }
+
+            // if ("layer.preview".equals(action)) {
+            //     String basePath =
+            // RequestCycle.get().getUrlRenderer().renderContextRelativeUrl("wicket/bookmarkable/org.geoserver.gwc.web.layer.CachedLayersPage");
+            //     Url url = Url.parse(basePath);
+            //     if (selectedWorkspace != null) {
+            //         url.setQueryParameter("workspace", selectedWorkspace);
+            //     }
+            //     return RequestCycle.get().getUrlRenderer().renderFullUrl(url);
+            // }
 
             PageParameters params = new PageParameters();
             if (selectedWorkspace != null) {
@@ -1306,39 +1378,88 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
     private static final List<BreadcrumbOption> WORKSPACE_BREADCRUMB_OPTIONS = List.of(
             new BreadcrumbOption("Workspace", "workspace.section", true, null, false),
-            new BreadcrumbOption("Edit Settings (Name, URI)", "workspace.editSettings"),
-            new BreadcrumbOption("Contact Information", "workspace.contactInformation"),
-            new BreadcrumbOption("Security (Data Access Rules)", "workspace.security"),
-            new BreadcrumbOption("Isolated Workspace", "workspace.isolated"),
+            new BreadcrumbOption("Edit Settings", "workspace.editSettings"),
+            // new BreadcrumbOption("Contact Information", "workspace.contactInformation"),
+            // new BreadcrumbOption("Security (Data Access Rules)", "workspace.security"),
+            new BreadcrumbOption("Browse", "workspace.data.layersPreview"),
+            // new BreadcrumbOption("Isolated Workspace", "workspace.isolated"),
+            new BreadcrumbOption("Data", "workspace.section.data", true, null, false, true),
+            new BreadcrumbOption("Stores", "workspace.data.stores"),
+            new BreadcrumbOption("Layers", "workspace.data.layers"),
+            new BreadcrumbOption("Layer Groups", "workspace.data.layerGroups"),
+            new BreadcrumbOption("Styles", "workspace.data.styles"),
+            new BreadcrumbOption("Tile Caching", "workspace.section.tileCaching", true, null, false, true),
+            new BreadcrumbOption("Tile layers", "workspace.tileLayers"),
             new BreadcrumbOption("Service Overrides", "workspace.section.serviceOverrides", true, null, false, true),
             new BreadcrumbOption("WMS Settings", "workspace.wmsOverride", false, "override", false),
+            new BreadcrumbOption("WMTS Settings", "workspace.wmtsOverride", false, "override", false),
             new BreadcrumbOption("WFS Settings", "workspace.wfsOverride", false, "override", false),
             new BreadcrumbOption("WCS Settings", "workspace.wcsOverride", false, "override", false),
-            new BreadcrumbOption("Data", "workspace.section.data", true, null, false, true),
-            new BreadcrumbOption("All Layers", "workspace.data.allLayers", false, "62", false),
-            new BreadcrumbOption("Stores", "workspace.data.stores"),
-            new BreadcrumbOption("Layer Preview", "workspace.data.layerPreview"),
             new BreadcrumbOption("Remove Workspace", "workspace.remove", false, null, true, true));
 
     private static final List<BreadcrumbOption> LAYER_BREADCRUMB_OPTIONS = List.of(
             new BreadcrumbOption("Layer", "layer.section", true, null, false),
-            new BreadcrumbOption("Edit Layer (Data)", "layer.editData"),
-            new BreadcrumbOption("Publishing Settings", "layer.publishing"),
-            new BreadcrumbOption("Layer Security", "layer.security"),
-            new BreadcrumbOption("Edit SLD Style", "layer.editStyle"),
-            new BreadcrumbOption("Preview", "layer.section.preview", true, null, false, true),
-            new BreadcrumbOption("OpenLayers", "layer.preview.openlayers"),
-            new BreadcrumbOption("KML / KMZ", "layer.preview.kml"),
-            new BreadcrumbOption("Output Formats (WFS)", "layer.section.outputFormats", true, null, false, true),
-            new BreadcrumbOption("GML 3.2", "layer.output.wfs.gml", false, "xml", false),
-            new BreadcrumbOption("GeoJSON", "layer.output.wfs.geojson", false, "json", false),
-            new BreadcrumbOption("CSV", "layer.output.wfs.csv", false, "csv", false),
-            new BreadcrumbOption("Shapefile", "layer.output.wfs.shp", false, "shp", false),
-            new BreadcrumbOption("Image Formats (WMS)", "layer.section.imageFormats", true, null, false, true),
-            new BreadcrumbOption("PNG / JPEG / TIFF / GIF / SVG / PDF", "layer.output.wms.images", false, null, false),
-            new BreadcrumbOption("Tile Caching", "layer.caching", false, null, false, true),
-            new BreadcrumbOption("Dimensions (Time / Elevation)", "layer.dimensions"),
+            new BreadcrumbOption("Edit Settings", "layer.editSettings"),
+            // new BreadcrumbOption("Publishing Settings", "layer.publishing"),
+            // new BreadcrumbOption("Security", "layer.security"),
+            new BreadcrumbOption("Preview", "layer.preview.openlayers"),
+            new BreadcrumbOption("Data", "layer.section.data", true, null, false, true),
+            // new BreadcrumbOption("Workspace", "layer.data.workspace"),
+            new BreadcrumbOption("Store", "layer.data.store"),
+            new BreadcrumbOption("Styles", "layer.data.styles"),
+            // new BreadcrumbOption("Edit SLD Style", "layer.editStyle"),
+            // new BreadcrumbOption("Preview", "layer.section.preview", true, null, false, true),
+            // new BreadcrumbOption("OpenLayers", "layer.preview.openlayers"),
+            // new BreadcrumbOption("KML / KMZ", "layer.preview.kml"),
+            // new BreadcrumbOption("Output Formats (WFS)", "layer.section.outputFormats", true, null, false, true),
+            // new BreadcrumbOption("GML 3.2", "layer.output.wfs.gml", false, "xml", false),
+            // new BreadcrumbOption("GeoJSON", "layer.output.wfs.geojson", false, "json", false),
+            // new BreadcrumbOption("CSV", "layer.output.wfs.csv", false, "csv", false),
+            // new BreadcrumbOption("Shapefile", "layer.output.wfs.shp", false, "shp", false),
+            // new BreadcrumbOption("Image Formats (WMS)", "layer.section.imageFormats", true, null, false, true),
+            // new BreadcrumbOption("PNG / JPEG / TIFF / GIF / SVG / PDF", "layer.output.wms.images", false, null,
+            // false),
+            // new BreadcrumbOption("Tile Caching", "layer.caching", false, null, false, true),
+            // new BreadcrumbOption("Dimensions (Time / Elevation)", "layer.dimensions"),
             new BreadcrumbOption("Remove Layer", "layer.remove", false, null, true, true));
+
+    private static final List<BreadcrumbOption> LAYER_GROUP_BREADCRUMB_OPTIONS = List.of(
+            new BreadcrumbOption("Layer Group", "layerGroup.section", true, null, false),
+            new BreadcrumbOption("Edit Settings", "layerGroup.editSettings"),
+            // new BreadcrumbOption("Publishing Settings", "layer.publishing"),
+            // new BreadcrumbOption("Security", "layer.security"),
+            new BreadcrumbOption("Preview", "layerGroup.preview.openlayers"),
+            new BreadcrumbOption("Data", "layerGroup.section.data", true, null, false, true),
+            // new BreadcrumbOption("Workspace", "layer.data.workspace"),
+            // new BreadcrumbOption("Store", "layer.data.store"),
+            new BreadcrumbOption("Styles", "layerGroup.data.styles"),
+            // new BreadcrumbOption("Edit SLD Style", "layer.editStyle"),
+            // new BreadcrumbOption("Preview", "layer.section.preview", true, null, false, true),
+            // new BreadcrumbOption("OpenLayers", "layer.preview.openlayers"),
+            // new BreadcrumbOption("KML / KMZ", "layer.preview.kml"),
+            // new BreadcrumbOption("Output Formats (WFS)", "layer.section.outputFormats", true, null, false, true),
+            // new BreadcrumbOption("GML 3.2", "layer.output.wfs.gml", false, "xml", false),
+            // new BreadcrumbOption("GeoJSON", "layer.output.wfs.geojson", false, "json", false),
+            // new BreadcrumbOption("CSV", "layer.output.wfs.csv", false, "csv", false),
+            // new BreadcrumbOption("Shapefile", "layer.output.wfs.shp", false, "shp", false),
+            // new BreadcrumbOption("Image Formats (WMS)", "layer.section.imageFormats", true, null, false, true),
+            // new BreadcrumbOption("PNG / JPEG / TIFF / GIF / SVG / PDF", "layer.output.wms.images", false, null,
+            // false),
+            // new BreadcrumbOption("Tile Caching", "layer.caching", false, null, false, true),
+            // new BreadcrumbOption("Dimensions (Time / Elevation)", "layer.dimensions"),
+            new BreadcrumbOption("Remove Layer Group", "layerGroup.remove", false, null, true, true));
+
+    private static final List<BreadcrumbOption> ANONYMOUS_WORKSPACE_BREADCRUMB_OPTIONS = List.of(
+            new BreadcrumbOption("Workspace", "workspace.section", true, null, false),
+            new BreadcrumbOption("Browse", "workspace.data.layersPreview"));
+
+    private static final List<BreadcrumbOption> ANONYMOUS_LAYER_BREADCRUMB_OPTIONS = List.of(
+            new BreadcrumbOption("Layer", "layer.section", true, null, false),
+            new BreadcrumbOption("Preview", "layer.preview.openlayers"));
+
+    private static final List<BreadcrumbOption> ANONYMOUS_LAYER_GROUP_BREADCRUMB_OPTIONS = List.of(
+            new BreadcrumbOption("Layer Group", "layerGroup.section", true, null, false),
+            new BreadcrumbOption("Preview", "layerGroup.preview.openlayers"));
 
     private Component localeSwitcher() {
         // defaults to English to have a more compact dropdown

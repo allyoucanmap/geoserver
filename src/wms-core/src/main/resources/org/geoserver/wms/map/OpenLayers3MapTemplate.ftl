@@ -9,16 +9,17 @@
     <title>OpenLayers map preview</title>
   </head>
   <body>
+  <div id="header" class="gs-header">
+      <div class="gs-header-bar">
+        <div class="gs-header-left">
+        </div>
+        <div class="gs-header-right">
+        </div>
+      </div>
+    <div class="gs-header-backdrop" id="header-backdrop" aria-hidden="true"></div>
+  </div><!-- /#header -->
   <div id="main">
     <div id="sidebar">
-      <div id="brand">
-        <a wicket:id="home" id="logo" href="#"></a>
-        <button id="navigation-menu">
-          <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'>
-            <path stroke='currentColor' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22' />
-          </svg>
-        </button>
-      </div>
       <div id="sidebar-content">
         <div id="toolbar" class="preview-form">
           <label>WMS version:</label>

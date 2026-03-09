@@ -25,6 +25,7 @@ import org.apache.wicket.extensions.markup.html.repeater.util.SortableDataProvid
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.Predicates;
 import org.geoserver.web.GeoServerApplication;
@@ -341,10 +342,32 @@ public abstract class GeoServerDataProvider<T> extends SortableDataProvider<T, O
      *     {@link Filter#INCLUDE} is returned.
      */
     protected Filter getFilter() {
-        return Streams.of(getKeywords())
+        // 1. Get the workspace parameter from Wicket
+        String wsName = RequestCycle.get()
+                .getRequest()
+                .getRequestParameters()
+                .getParameterValue("workspace")
+                .toOptionalString();
+
+        // 2. Build the Keyword Filter (your default behavior)
+        Filter keywordFilter = Streams.of(getKeywords())
                 .map(this::computeKeywordFilter)
                 .reduce(Predicates::or)
-                .orElseGet(Predicates::acceptAll);
+                .orElse(null); // Use null here to check if keywords actually yielded a filter
+
+        // 3. Handle the Workspace Filter Logic
+        if (wsName != null) {
+            // Create a filter that catches both Layers and Layer Groups
+            Filter layerWS = Predicates.equal("resource.store.workspace.name", wsName);
+            Filter groupWS = Predicates.equal("workspace.name", wsName);
+            Filter combinedWS = Predicates.or(layerWS, groupWS);
+
+            // If keywords exist, AND them with the workspace. Otherwise, just return workspace.
+            return (keywordFilter != null) ? Predicates.and(combinedWS, keywordFilter) : combinedWS;
+        }
+
+        // 4. Fallback: If no workspace is provided, return only the keyword filter
+        return (keywordFilter != null) ? keywordFilter : Predicates.acceptAll();
     }
 
     private Filter computeKeywordFilter(String keyword) {
