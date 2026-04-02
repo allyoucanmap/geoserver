@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.wicket.MetaDataKey;
 import org.apache.wicket.ajax.AbstractDefaultAjaxBehavior;
 import org.apache.wicket.ajax.AjaxEventBehavior;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -30,6 +31,7 @@ import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.Panel;
+import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.ResourceModel;
 import org.apache.wicket.request.IRequestParameters;
@@ -101,9 +103,12 @@ public class NavigationTreePanel extends Panel {
             new JavaScriptResourceReference(NavigationTreePanel.class, "NavigationTreePanel.js");
     private static final FilterFactory FF = CommonFactoryFinder.getFilterFactory();
     private static final SortBy ALPHABETICAL = FF.sort("name", SortOrder.ASCENDING);
+    private static final MetaDataKey<Boolean> NAVTREE_GLOBAL_EXPANDED_KEY = new MetaDataKey<>() {};
+    private static final MetaDataKey<Boolean> NAVTREE_WORKSPACES_EXPANDED_KEY = new MetaDataKey<>() {};
 
     public NavigationTreePanel(String id) {
         super(id);
+        restoreSectionStateFromSession();
 
         add(new SearchInputPanel("myCustomSearch", false));
 
@@ -124,11 +129,38 @@ public class NavigationTreePanel extends Panel {
             @Override
             protected void populateItem(ListItem<SidebarNewMenuItemInfo> item) {
                 SidebarNewMenuItemInfo info = item.getModelObject();
-                BookmarkablePageLink<Void> link = new BookmarkablePageLink<>("link", info.getComponentClass());
                 String titleKey = info.getTitleKey();
+
+                String workspaceParam =
+                        getPage().getPageParameters().get("workspace").toOptionalString();
+                boolean hasWorkspace = !Strings.isEmpty(workspaceParam);
+                boolean includeWorkspaceParam = info.isIncludeWorkspaceParam();
+
+                PageParameters linkParams = null;
+                if (hasWorkspace && includeWorkspaceParam) {
+                    linkParams = new PageParameters();
+                    linkParams.add("workspace", workspaceParam);
+                }
+
+                BookmarkablePageLink<Void> link = linkParams != null
+                        ? new BookmarkablePageLink<>("link", info.getComponentClass(), linkParams)
+                        : new BookmarkablePageLink<>("link", info.getComponentClass());
                 Label label;
                 if (titleKey != null && !titleKey.isEmpty()) {
-                    label = new Label("label", new ResourceModel(titleKey, titleKey));
+                    final IModel<String> baseLabelModel = new ResourceModel(titleKey, titleKey);
+                    final String workspaceName = workspaceParam;
+                    IModel<String> labelModel = baseLabelModel;
+                    if (hasWorkspace && includeWorkspaceParam) {
+                        // When the home page is already scoped to a workspace, show it on the "New" menu items
+                        // to make context clear while editing resources.
+                        labelModel = new LoadableDetachableModel<>() {
+                            @Override
+                            protected String load() {
+                                return baseLabelModel.getObject() + " (" + workspaceName + ")";
+                            }
+                        };
+                    }
+                    label = new Label("label", labelModel);
                 } else {
                     label = new Label("label", "");
                 }
@@ -166,6 +198,7 @@ public class NavigationTreePanel extends Panel {
             @Override
             protected void onEvent(AjaxRequestTarget target) {
                 globalExpanded = !globalExpanded;
+                persistSectionStateInSession();
                 target.add(globalSectionBody);
                 target.add(globalToggle);
                 target.appendJavaScript(initCall());
@@ -173,6 +206,19 @@ public class NavigationTreePanel extends Panel {
         });
         globalToggle.add(new ToggleCaretIcon("globalSectionToggleIcon", () -> isGlobalExpanded()));
         globalSectionContainer.add(globalToggle);
+
+        AjaxLink<Void> globalSectionSelect = new AjaxLink<>("globalSectionSelect") {
+            @Override
+            public void onClick(AjaxRequestTarget target) {
+                globalExpanded = !globalExpanded;
+                persistSectionStateInSession();
+                target.add(globalSectionBody);
+                target.add(globalToggle);
+                target.appendJavaScript(initCall());
+                navigateToHome(null, null);
+            }
+        };
+        globalSectionContainer.add(globalSectionSelect);
         globalSectionContainer.add(new Label("globalCount", new LoadableDetachableModel<String>() {
             @Override
             protected String load() {
@@ -258,6 +304,7 @@ public class NavigationTreePanel extends Panel {
             @Override
             protected void onEvent(AjaxRequestTarget target) {
                 workspacesExpanded = !workspacesExpanded;
+                persistSectionStateInSession();
                 target.add(workspacesSectionBody);
                 target.add(workspacesToggle);
                 target.appendJavaScript(initCall());
@@ -269,6 +316,11 @@ public class NavigationTreePanel extends Panel {
         AjaxLink<Void> workspacesSectionSelect = new AjaxLink<>("workspacesSectionSelect") {
             @Override
             public void onClick(AjaxRequestTarget target) {
+                workspacesExpanded = !workspacesExpanded;
+                persistSectionStateInSession();
+                target.add(workspacesSectionBody);
+                target.add(workspacesToggle);
+                target.appendJavaScript(initCall());
                 navigateToHome(null, null);
             }
         };
@@ -493,6 +545,24 @@ public class NavigationTreePanel extends Panel {
         return GeoServerApplication.get().getCatalog();
     }
 
+    private void restoreSectionStateFromSession() {
+        GeoServerSession session = GeoServerSession.get();
+        Boolean savedGlobal = session.getMetaData(NAVTREE_GLOBAL_EXPANDED_KEY);
+        Boolean savedWorkspaces = session.getMetaData(NAVTREE_WORKSPACES_EXPANDED_KEY);
+        if (savedGlobal != null) {
+            globalExpanded = savedGlobal;
+        }
+        if (savedWorkspaces != null) {
+            workspacesExpanded = savedWorkspaces;
+        }
+    }
+
+    private void persistSectionStateInSession() {
+        GeoServerSession session = GeoServerSession.get();
+        session.setMetaData(NAVTREE_GLOBAL_EXPANDED_KEY, globalExpanded);
+        session.setMetaData(NAVTREE_WORKSPACES_EXPANDED_KEY, workspacesExpanded);
+    }
+
     private Filter buildSearchFilter(String propertyName) {
         if (Strings.isEmpty(treeFilterQuery)) return Filter.INCLUDE;
         String escaped =
@@ -619,7 +689,6 @@ public class NavigationTreePanel extends Panel {
             if (paramWorkspace != null) {
                 WorkspaceState state = workspaceStates.computeIfAbsent(paramWorkspace, n -> new WorkspaceState());
                 state.expanded = true;
-                workspacesExpanded = true;
                 if (paramLayer != null) {
                     int idx = findWorkspaceChildIndex(paramWorkspace, paramLayer);
                     if (idx >= 0) {
@@ -629,7 +698,6 @@ public class NavigationTreePanel extends Panel {
                     }
                 }
             } else if (paramLayer != null) {
-                globalExpanded = true;
                 int idx = findGlobalChildIndex(paramLayer);
                 if (idx >= 0) {
                     globalPage = (idx / globalPageSize) + 1;

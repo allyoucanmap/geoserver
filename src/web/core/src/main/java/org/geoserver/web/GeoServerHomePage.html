@@ -79,54 +79,38 @@
 	</table> -->
 	<div class="catalog-links">
 
-		<div class="catalog-link">
+		<div class="catalog-link" wicket:id="layersContainer">
 			<div class="catalog-link-content">
-				<h5>
-					<a wicket:id="layersLink">
-						<span wicket:id="nlayers"></span> <wicket:message key="layers">layers</wicket:message>
-					</a>
-				</h5>
-				<a wicket:id="addLayerLink" class="button outline-primary">
-					<wicket:message key="addLayers">Add new layer</wicket:message>
+				<a wicket:id="layersLink">
+					<div class="catalog-link-title"><wicket:message key="layers">layers</wicket:message></div>
+					<div class="catalog-link-value" wicket:id="nlayers"></div>
 				</a>
 			</div>
 		</div>
 
-		<div class="catalog-link">
+		<div class="catalog-link" wicket:id="groupsContainer">
 			<div class="catalog-link-content">
-				<h5>
-					<a wicket:id="groupsLink">
-						<span wicket:id="ngroups"></span> <wicket:message key="groups">groups</wicket:message>
-					</a>
-				</h5>
-				<a wicket:id="addGroupLink" class="button outline-primary">
-					<wicket:message key="addGroups">Add new layer group</wicket:message>
+				<a wicket:id="groupsLink">
+					<div class="catalog-link-title"><wicket:message key="groups">groups</wicket:message></div>
+					<div class="catalog-link-value" wicket:id="ngroups"></div>
 				</a>
 			</div>
 		</div>
 
-		<div class="catalog-link">
+		<div class="catalog-link" wicket:id="storesContainer">
 			<div class="catalog-link-content">
-				<h5>
-					<a wicket:id="storesLink">
-						<span wicket:id="nstores"></span> <wicket:message key="stores">stores</wicket:message>
-					</a>
-				</h5>
-				<a wicket:id="addStoreLink" class="button outline-primary">
-					<wicket:message key="addStores">Add new store</wicket:message>
+				<a wicket:id="storesLink">
+					<div class="catalog-link-title"><wicket:message key="stores">stores</wicket:message></div>
+					<div class="catalog-link-value" wicket:id="nstores"></div>
 				</a>
 			</div>
 		</div>
 
-		<div class="catalog-link">
+		<div class="catalog-link" wicket:id="workspacesContainer">
 			<div class="catalog-link-content">
-				<h5>
-					<a wicket:id="workspacesLink">
-						<span wicket:id="nworkspaces"></span> <wicket:message key="workspaces">workspaces</wicket:message>
-					</a>
-				</h5>
-				<a wicket:id="addWorkspaceLink" class="button outline-primary">
-					<wicket:message key="addWorkspaces">Add new workspaces</wicket:message>
+				<a wicket:id="workspacesLink">
+					<div class="catalog-link-title"><wicket:message key="workspaces">workspaces</wicket:message></div>
+					<div class="catalog-link-value" wicket:id="nworkspaces"></div>
 				</a>
 			</div>
 		</div>

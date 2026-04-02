@@ -40,6 +40,7 @@ import org.apache.wicket.markup.html.link.ExternalLink;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
+import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.StringResourceModel;
@@ -49,6 +50,7 @@ import org.apache.wicket.request.mapper.parameter.INamedParameters.Type;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
 import org.apache.wicket.request.resource.PackageResourceReference;
 import org.apache.wicket.resource.JQueryResourceReference;
+import org.apache.wicket.util.string.Strings;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.config.GeoServer;
 import org.geoserver.ows.URLMangler;
@@ -327,11 +329,35 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
             @Override
             public void populateItem(ListItem<MenuPageInfo<GeoServerBasePage>> item) {
                 MenuPageInfo<GeoServerBasePage> info = item.getModelObject();
+                String ws = getPageParameters().get("workspace").toOptionalString();
+                final boolean hasWorkspace = !Strings.isEmpty(ws);
+                final boolean includeWorkspace = info.isIncludeWorkspaceParam();
+
                 BookmarkablePageLink<GeoServerBasePage> link =
-                        new BookmarkablePageLink<>("link", info.getComponentClass());
+                        new BookmarkablePageLink<>("link", info.getComponentClass()) {
+                            @Override
+                            public PageParameters getPageParameters() {
+                                PageParameters pageParams = super.getPageParameters();
+                                if (hasWorkspace && includeWorkspace) {
+                                    pageParams.add("workspace", ws);
+                                }
+                                return pageParams;
+                            }
+                        };
                 link.add(AttributeModifier.replace(
                         "title", new StringResourceModel(info.getDescriptionKey(), null, null)));
-                link.add(new Label("link.label", new StringResourceModel(info.getTitleKey(), null, null)));
+                final StringResourceModel baseTitle = new StringResourceModel(info.getTitleKey(), null, null);
+                IModel<String> titleModel = baseTitle;
+                if (hasWorkspace && includeWorkspace) {
+                    final String workspaceName = ws;
+                    titleModel = new LoadableDetachableModel<>() {
+                        @Override
+                        protected String load() {
+                            return baseTitle.getString() + " (" + workspaceName + ")";
+                        }
+                    };
+                }
+                link.add(new Label("link.label", titleModel));
                 item.add(link);
             }
         });
@@ -457,18 +483,35 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
     private void createMenuComponent(ListItem<MenuPageInfo<GeoServerBasePage>> item) {
         MenuPageInfo<GeoServerBasePage> info = item.getModelObject();
+        String ws = getPageParameters().get("workspace").toOptionalString();
+        final boolean hasWorkspace = !Strings.isEmpty(ws);
+        final boolean includeWorkspace = info.isIncludeWorkspaceParam();
         BookmarkablePageLink<Page> link = new BookmarkablePageLink<>("link", info.getComponentClass()) {
 
             @Override
             public PageParameters getPageParameters() {
                 PageParameters pageParams = super.getPageParameters();
                 pageParams.add(GeoServerTablePanel.FILTER_PARAM, false, Type.PATH);
+                if (hasWorkspace && includeWorkspace) {
+                    pageParams.add("workspace", ws);
+                }
                 return pageParams;
             }
         };
 
         link.add(AttributeModifier.replace("title", new StringResourceModel(info.getDescriptionKey(), null, null)));
-        link.add(new Label("link.label", new StringResourceModel(info.getTitleKey(), null, null)));
+        final StringResourceModel baseTitle = new StringResourceModel(info.getTitleKey(), null, null);
+        IModel<String> titleModel = baseTitle;
+        if (hasWorkspace && includeWorkspace) {
+            final String workspaceName = ws;
+            titleModel = new LoadableDetachableModel<>() {
+                @Override
+                protected String load() {
+                    return baseTitle.getString() + " (" + workspaceName + ")";
+                }
+            };
+        }
+        link.add(new Label("link.label", titleModel));
         WebComponent image;
         if (info.getIcon() != null) {
             if (info.getIcon().startsWith("/")) {

@@ -58,12 +58,8 @@ import org.geoserver.config.SettingsInfo;
 import org.geoserver.platform.GeoServerExtensions;
 import org.geoserver.util.InternationalStringUtils;
 import org.geoserver.web.data.layer.LayerPage;
-import org.geoserver.web.data.layer.NewLayerPage;
-import org.geoserver.web.data.layergroup.LayerGroupEditPage;
 import org.geoserver.web.data.layergroup.LayerGroupPage;
-import org.geoserver.web.data.store.NewDataPage;
 import org.geoserver.web.data.store.StorePage;
-import org.geoserver.web.data.workspace.WorkspaceNewPage;
 import org.geoserver.web.data.workspace.WorkspacePage;
 import org.geotools.api.util.InternationalString;
 import org.geotools.feature.NameImpl;
@@ -198,7 +194,20 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
 
         // additional content provided by plugins across the geoserver codebase
         // for example security warnings to admin
-        add(additionalHomePageContent());
+        ListView<GeoServerHomePageContentProvider> contributedContent = additionalHomePageContent();
+        PageParameters pageParams = getPageParameters();
+        String workspaceParam = pageParams.get("workspace").toOptionalString();
+        String layerParam = pageParams.get("layer").toOptionalString();
+        String groupParam = pageParams.get("group").toOptionalString();
+
+        boolean hasContextParams = StringUtils.isNotBlank(workspaceParam)
+                || StringUtils.isNotBlank(layerParam)
+                || StringUtils.isNotBlank(groupParam);
+
+        // Only show contributed content for the global home page context.
+        // When scoped to workspace/layer/group, hide it.
+        contributedContent.setVisible(!hasContextParams);
+        add(contributedContent);
 
         List<ServiceDescription> serviceDescriptions = new ArrayList<>();
         List<ServiceLinkDescription> serviceLinks = new ArrayList<>();
@@ -523,52 +532,86 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
             Fragment catalogLinks = new Fragment("catalogLinks", "catalogLinksFragment", this);
             Catalog catalog = getCatalog();
 
-            int layerCount, groupCount, storesCount, wsCount;
-            if (publishedInfo != null) {
-                if (publishedInfo instanceof LayerInfo) {
-                    layerCount = 1;
-                    groupCount = 0;
-                    storesCount = 1;
+            PageParameters pageParams = getPageParameters();
+            String workspaceParam = pageParams.get("workspace").toOptionalString();
+            String layerParam = pageParams.get("layer").toOptionalString();
+            String groupsParam = pageParams.get("groups").toOptionalString();
+
+            boolean hasWorkspaceParam = StringUtils.isNotBlank(workspaceParam);
+            boolean hasLayerParam = StringUtils.isNotBlank(layerParam);
+            boolean hasGroupsParam = StringUtils.isNotBlank(groupsParam);
+
+            boolean workspaceOnly = hasWorkspaceParam && !hasLayerParam && !hasGroupsParam;
+            boolean hideAll = hasLayerParam || hasGroupsParam;
+
+            boolean showLayers = !hideAll;
+            boolean showGroups = !hideAll;
+            boolean showStores = !hideAll;
+            boolean showWorkspaces = !hideAll && !workspaceOnly;
+
+            int layerCount = 0, groupCount = 0, storesCount = 0, wsCount = 0;
+            if (!hideAll) {
+                if (publishedInfo != null) {
+                    if (publishedInfo instanceof LayerInfo) {
+                        layerCount = 1;
+                        groupCount = 0;
+                        storesCount = 1;
+                        wsCount = 1;
+                    } else {
+                        layerCount = 0;
+                        groupCount = 1;
+                        storesCount = 0;
+                        wsCount = publishedInfo.prefixedName().contains(":") ? 1 : 0;
+                    }
+                } else if (workspaceInfo != null) {
+                    layerCount = catalog.count(
+                            LayerInfo.class, Predicates.equal("resource.namespace.prefix", workspaceInfo.getName()));
+                    groupCount = catalog.count(
+                            LayerGroupInfo.class, Predicates.equal("workspace.name", workspaceInfo.getName()));
+                    storesCount =
+                            catalog.count(StoreInfo.class, Predicates.equal("workspace.name", workspaceInfo.getName()));
                     wsCount = 1;
                 } else {
-                    layerCount = 0;
-                    groupCount = 1;
-                    storesCount = 0;
-                    wsCount = publishedInfo.prefixedName().contains(":") ? 1 : 0;
+                    layerCount = catalog.count(LayerInfo.class, acceptAll());
+                    groupCount = catalog.count(LayerGroupInfo.class, acceptAll());
+                    storesCount = catalog.count(StoreInfo.class, acceptAll());
+                    wsCount = catalog.count(WorkspaceInfo.class, acceptAll());
                 }
-            } else if (workspaceInfo != null) {
-                layerCount = catalog.count(
-                        LayerInfo.class, Predicates.equal("resource.namespace.prefix", workspaceInfo.getName()));
-                groupCount = catalog.count(
-                        LayerGroupInfo.class, Predicates.equal("workspace.name", workspaceInfo.getName()));
-                storesCount =
-                        catalog.count(StoreInfo.class, Predicates.equal("workspace.name", workspaceInfo.getName()));
-                wsCount = 1;
-            } else {
-                layerCount = catalog.count(LayerInfo.class, acceptAll());
-                groupCount = catalog.count(LayerGroupInfo.class, acceptAll());
-                storesCount = catalog.count(StoreInfo.class, acceptAll());
-                wsCount = catalog.count(WorkspaceInfo.class, acceptAll());
             }
 
             NumberFormat numberFormat = NumberFormat.getIntegerInstance(getLocale());
             numberFormat.setGroupingUsed(true);
 
-            catalogLinks.add(new BookmarkablePageLink<>("layersLink", LayerPage.class)
+            // When the home page is already scoped to a workspace (workspace param only), make
+            // the cards keep that context while navigating to their respective pages.
+            PageParameters workspaceLinkParams = new PageParameters();
+            if (workspaceOnly && hasWorkspaceParam) {
+                workspaceLinkParams.add("workspace", workspaceParam);
+            }
+
+            WebMarkupContainer layersContainer = new WebMarkupContainer("layersContainer");
+            layersContainer.setVisible(showLayers);
+            layersContainer.add(new BookmarkablePageLink<>("layersLink", LayerPage.class, workspaceLinkParams)
                     .add(new Label("nlayers", numberFormat.format(layerCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addLayerLink", NewLayerPage.class));
+            catalogLinks.add(layersContainer);
 
-            catalogLinks.add(new BookmarkablePageLink<>("groupsLink", LayerGroupPage.class)
+            WebMarkupContainer groupsContainer = new WebMarkupContainer("groupsContainer");
+            groupsContainer.setVisible(showGroups);
+            groupsContainer.add(new BookmarkablePageLink<>("groupsLink", LayerGroupPage.class, workspaceLinkParams)
                     .add(new Label("ngroups", numberFormat.format(groupCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addGroupLink", LayerGroupEditPage.class));
+            catalogLinks.add(groupsContainer);
 
-            catalogLinks.add(new BookmarkablePageLink<>("storesLink", StorePage.class)
+            WebMarkupContainer storesContainer = new WebMarkupContainer("storesContainer");
+            storesContainer.setVisible(showStores);
+            storesContainer.add(new BookmarkablePageLink<>("storesLink", StorePage.class, workspaceLinkParams)
                     .add(new Label("nstores", numberFormat.format(storesCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addStoreLink", NewDataPage.class));
+            catalogLinks.add(storesContainer);
 
-            catalogLinks.add(new BookmarkablePageLink<>("workspacesLink", WorkspacePage.class)
+            WebMarkupContainer workspacesContainer = new WebMarkupContainer("workspacesContainer");
+            workspacesContainer.setVisible(showWorkspaces);
+            workspacesContainer.add(new BookmarkablePageLink<>("workspacesLink", WorkspacePage.class)
                     .add(new Label("nworkspaces", numberFormat.format(wsCount))));
-            catalogLinks.add(new BookmarkablePageLink<>("addWorkspaceLink", WorkspaceNewPage.class));
+            catalogLinks.add(workspacesContainer);
             return catalogLinks;
         } finally {
             sw.stop();
