@@ -206,10 +206,20 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                     loginForm.add(new Label("link.label", ""));
                 }
 
+                String redirectUrl = null;
+                if (org.geoserver.security.filter.GeoServerUserNamePasswordAuthenticationFilter.class.equals(
+                        info.getFilterClass())) {
+                    String ws = getPageParameters().get("workspace").toOptionalString();
+                    if (ws != null && !ws.isEmpty()) {
+                        redirectUrl = "/web/?workspace=" + ws;
+                    }
+                }
                 LoginFormHTMLInclude include;
                 if (info.getInclude() != null) {
                     include = new LoginFormHTMLInclude(
-                            "login.include", new PackageResourceReference(info.getComponentClass(), info.getInclude()));
+                            "login.include",
+                            new PackageResourceReference(info.getComponentClass(), info.getInclude()),
+                            redirectUrl);
                 } else {
                     include = new LoginFormHTMLInclude("login.include", null);
                 }
