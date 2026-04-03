@@ -40,7 +40,6 @@ import org.apache.wicket.markup.html.link.ExternalLink;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
-import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.StringResourceModel;
@@ -347,17 +346,14 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
                 link.add(AttributeModifier.replace(
                         "title", new StringResourceModel(info.getDescriptionKey(), null, null)));
                 final StringResourceModel baseTitle = new StringResourceModel(info.getTitleKey(), null, null);
-                IModel<String> titleModel = baseTitle;
+                link.add(new Label("link.label", baseTitle));
+                WebMarkupContainer wsIndicator = new WebMarkupContainer("link.wsIndicator");
                 if (hasWorkspace && includeWorkspace) {
-                    final String workspaceName = ws;
-                    titleModel = new LoadableDetachableModel<>() {
-                        @Override
-                        protected String load() {
-                            return baseTitle.getString() + " (" + workspaceName + ")";
-                        }
-                    };
+                    wsIndicator.add(AttributeModifier.replace("title", ws));
+                } else {
+                    wsIndicator.setVisible(false);
                 }
-                link.add(new Label("link.label", titleModel));
+                link.add(wsIndicator);
                 item.add(link);
             }
         });
@@ -501,17 +497,14 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
 
         link.add(AttributeModifier.replace("title", new StringResourceModel(info.getDescriptionKey(), null, null)));
         final StringResourceModel baseTitle = new StringResourceModel(info.getTitleKey(), null, null);
-        IModel<String> titleModel = baseTitle;
+        link.add(new Label("link.label", baseTitle));
+        WebMarkupContainer wsIndicator = new WebMarkupContainer("link.wsIndicator");
         if (hasWorkspace && includeWorkspace) {
-            final String workspaceName = ws;
-            titleModel = new LoadableDetachableModel<>() {
-                @Override
-                protected String load() {
-                    return baseTitle.getString() + " (" + workspaceName + ")";
-                }
-            };
+            wsIndicator.add(AttributeModifier.replace("data-ws", ws));
+        } else {
+            wsIndicator.setVisible(false);
         }
-        link.add(new Label("link.label", titleModel));
+        link.add(wsIndicator);
         WebComponent image;
         if (info.getIcon() != null) {
             if (info.getIcon().startsWith("/")) {

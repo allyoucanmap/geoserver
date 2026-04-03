@@ -13,7 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.wicket.MetaDataKey;
+import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.ajax.AbstractDefaultAjaxBehavior;
 import org.apache.wicket.ajax.AjaxEventBehavior;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -31,7 +31,6 @@ import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
 import org.apache.wicket.markup.html.panel.Panel;
-import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.LoadableDetachableModel;
 import org.apache.wicket.model.ResourceModel;
 import org.apache.wicket.request.IRequestParameters;
@@ -59,18 +58,12 @@ public class NavigationTreePanel extends Panel {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private boolean globalExpanded = false;
-    private boolean workspacesExpanded = true;
-
-    private WebMarkupContainer workspacesSectionBody;
     private WebMarkupContainer workspacesScroll;
     private ListView<Workspace> workspacesList;
     private WebMarkupContainer globalSectionBody;
-    private WebMarkupContainer globalToggle;
-    private WebMarkupContainer workspacesToggle;
     private WebMarkupContainer globalSectionContainer;
-    private WebMarkupContainer workspacesSectionContainer;
     private WebMarkupContainer noDataMessage;
+    private WebMarkupContainer globalChildrenContainer;
     private ListView<WorkspaceChild> globalChildrenList;
     private WebMarkupContainer globalPagination;
 
@@ -81,9 +74,6 @@ public class NavigationTreePanel extends Panel {
     private static final int MAX_QUERY_LENGTH = 100;
     private int globalPage = 1;
     private int globalPageSize = PAGE_SIZE;
-    private int workspacesPage = 1;
-    private int workspacesPageSize = PAGE_SIZE;
-    private WebMarkupContainer workspacesPagination;
 
     private final Map<String, Integer> layerPageByWorkspace = new HashMap<>();
     private final Map<String, Integer> layerPageSizeByWorkspace = new HashMap<>();
@@ -103,12 +93,9 @@ public class NavigationTreePanel extends Panel {
             new JavaScriptResourceReference(NavigationTreePanel.class, "NavigationTreePanel.js");
     private static final FilterFactory FF = CommonFactoryFinder.getFilterFactory();
     private static final SortBy ALPHABETICAL = FF.sort("name", SortOrder.ASCENDING);
-    private static final MetaDataKey<Boolean> NAVTREE_GLOBAL_EXPANDED_KEY = new MetaDataKey<>() {};
-    private static final MetaDataKey<Boolean> NAVTREE_WORKSPACES_EXPANDED_KEY = new MetaDataKey<>() {};
 
     public NavigationTreePanel(String id) {
         super(id);
-        restoreSectionStateFromSession();
 
         add(new SearchInputPanel("myCustomSearch", false));
 
@@ -147,24 +134,18 @@ public class NavigationTreePanel extends Panel {
                         : new BookmarkablePageLink<>("link", info.getComponentClass());
                 Label label;
                 if (titleKey != null && !titleKey.isEmpty()) {
-                    final IModel<String> baseLabelModel = new ResourceModel(titleKey, titleKey);
-                    final String workspaceName = workspaceParam;
-                    IModel<String> labelModel = baseLabelModel;
-                    if (hasWorkspace && includeWorkspaceParam) {
-                        // When the home page is already scoped to a workspace, show it on the "New" menu items
-                        // to make context clear while editing resources.
-                        labelModel = new LoadableDetachableModel<>() {
-                            @Override
-                            protected String load() {
-                                return baseLabelModel.getObject() + " (" + workspaceName + ")";
-                            }
-                        };
-                    }
-                    label = new Label("label", labelModel);
+                    label = new Label("label", new ResourceModel(titleKey, titleKey));
                 } else {
                     label = new Label("label", "");
                 }
                 link.add(label);
+                WebMarkupContainer wsIndicator = new WebMarkupContainer("wsIndicator");
+                if (hasWorkspace && includeWorkspaceParam) {
+                    wsIndicator.add(AttributeModifier.replace("title", workspaceParam));
+                } else {
+                    wsIndicator.setVisible(false);
+                }
+                link.add(wsIndicator);
                 item.add(link);
             }
         });
@@ -172,49 +153,23 @@ public class NavigationTreePanel extends Panel {
         globalSectionContainer = new WebMarkupContainer("globalSectionContainer") {
             @Override
             public boolean isVisible() {
-                return getTotalGlobalItems() > 0;
+                return getTotalWorkspaceItems() + getTotalGlobalItems() > 0;
             }
         };
         globalSectionContainer.setOutputMarkupPlaceholderTag(true);
         add(globalSectionContainer);
 
-        globalSectionBody = new WebMarkupContainer("globalSectionBody") {
-            @Override
-            public boolean isVisible() {
-                return isGlobalExpanded();
-            }
-        };
+        globalSectionBody = new WebMarkupContainer("globalSectionBody");
         globalSectionBody.setOutputMarkupPlaceholderTag(true);
         globalSectionBody.setOutputMarkupId(true);
         globalSectionContainer.add(globalSectionBody);
 
-        globalToggle = new WebMarkupContainer("globalSectionToggle");
-        globalToggle.setOutputMarkupId(true);
-        globalToggle.add(
-                new org.apache.wicket.AttributeModifier("aria-expanded", () -> isGlobalExpanded() ? "true" : "false"));
-        globalToggle.add(
-                new org.apache.wicket.AttributeModifier("aria-controls", () -> globalSectionBody.getMarkupId()));
-        globalToggle.add(new AjaxEventBehavior("click") {
-            @Override
-            protected void onEvent(AjaxRequestTarget target) {
-                globalExpanded = !globalExpanded;
-                persistSectionStateInSession();
-                target.add(globalSectionBody);
-                target.add(globalToggle);
-                target.appendJavaScript(initCall());
-            }
-        });
-        globalToggle.add(new ToggleCaretIcon("globalSectionToggleIcon", () -> isGlobalExpanded()));
-        globalSectionContainer.add(globalToggle);
+        globalSectionContainer.add(new Image(
+                "globalIcon", new PackageResourceReference(GeoServerBasePage.class, "img/icons/silk/server.png")));
 
         AjaxLink<Void> globalSectionSelect = new AjaxLink<>("globalSectionSelect") {
             @Override
             public void onClick(AjaxRequestTarget target) {
-                globalExpanded = !globalExpanded;
-                persistSectionStateInSession();
-                target.add(globalSectionBody);
-                target.add(globalToggle);
-                target.appendJavaScript(initCall());
                 navigateToHome(null, null);
             }
         };
@@ -222,15 +177,20 @@ public class NavigationTreePanel extends Panel {
         globalSectionContainer.add(new Label("globalCount", new LoadableDetachableModel<String>() {
             @Override
             protected String load() {
-                return String.valueOf(getTotalGlobalItems());
+                return String.valueOf(getTotalWorkspaceItems() + getTotalGlobalItems());
             }
         }));
 
         LoadableDetachableModel<List<WorkspaceChild>> globalChildrenModel = new LoadableDetachableModel<>() {
             @Override
             protected List<WorkspaceChild> load() {
-                int offset = (globalPage - 1) * globalPageSize;
-                return getGlobalChildrenPage(offset, globalPageSize);
+                int totalWs = getTotalWorkspaceItems();
+                int combinedOffset = (globalPage - 1) * globalPageSize;
+                int combinedEnd = combinedOffset + globalPageSize;
+                int globalOffset = Math.max(0, combinedOffset - totalWs);
+                int globalCount = Math.max(0, combinedEnd - totalWs) - globalOffset;
+                if (globalCount <= 0) return new ArrayList<>();
+                return getGlobalChildrenPage(globalOffset, globalCount);
             }
         };
         globalChildrenList = new ListView<>("globalChildren", globalChildrenModel) {
@@ -244,6 +204,7 @@ public class NavigationTreePanel extends Panel {
                         navigateToHome(null, childInfo.name);
                     }
                 };
+                layerSelect.add(AttributeModifier.replace("title", childInfo.name));
                 if (selectedWorkspaceName == null && childInfo.name.equals(selectedLayerName)) {
                     item.add(AttributeAppender.append("class", "is-active"));
                 }
@@ -253,13 +214,25 @@ public class NavigationTreePanel extends Panel {
                 item.add(layerSelect);
             }
         };
-        globalChildrenList.setOutputMarkupId(true);
-        globalSectionBody.add(globalChildrenList);
+        globalChildrenContainer = new WebMarkupContainer("globalChildrenContainer") {
+            @Override
+            public boolean isVisible() {
+                return selectedWorkspaceName == null;
+            }
+        };
+        globalChildrenContainer.setOutputMarkupPlaceholderTag(true);
+        globalChildrenContainer.setOutputMarkupId(true);
+        globalChildrenContainer.add(globalChildrenList);
+        globalSectionBody.add(globalChildrenContainer);
+
+        workspacesScroll = new WebMarkupContainer("workspacesScroll");
+        workspacesScroll.setOutputMarkupId(true);
+        globalSectionBody.add(workspacesScroll);
 
         globalPagination = new WebMarkupContainer("globalPagination") {
             @Override
             public boolean isVisible() {
-                return getTotalGlobalItems() > PAGE_SIZE;
+                return selectedWorkspaceName == null && (getTotalWorkspaceItems() + getTotalGlobalItems()) > PAGE_SIZE;
             }
         };
         globalPagination.setOutputMarkupId(true);
@@ -268,91 +241,12 @@ public class NavigationTreePanel extends Panel {
         globalPagination.add(
                 new org.apache.wicket.AttributeModifier("data-page-size", () -> String.valueOf(globalPageSize)));
         globalPagination.add(new org.apache.wicket.AttributeModifier(
-                "data-total-items", () -> String.valueOf(getTotalGlobalItems())));
+                "data-total-items", () -> String.valueOf(getTotalWorkspaceItems() + getTotalGlobalItems())));
         globalPagination.add(new org.apache.wicket.AttributeModifier("data-total-pages", () -> {
-            int total = getTotalGlobalItems();
+            int total = getTotalWorkspaceItems() + getTotalGlobalItems();
             return String.valueOf((int) Math.ceil(total / (double) globalPageSize));
         }));
         globalSectionBody.add(globalPagination);
-
-        workspacesSectionContainer = new WebMarkupContainer("workspacesSectionContainer") {
-            @Override
-            public boolean isVisible() {
-                return getTotalWorkspaceItems() > 0;
-            }
-        };
-        workspacesSectionContainer.setOutputMarkupPlaceholderTag(true);
-        add(workspacesSectionContainer);
-
-        workspacesSectionBody = new WebMarkupContainer("workspacesSectionBody") {
-            @Override
-            public boolean isVisible() {
-                return workspacesExpanded;
-            }
-        };
-        workspacesSectionBody.setOutputMarkupPlaceholderTag(true);
-        workspacesSectionBody.setOutputMarkupId(true);
-        workspacesSectionContainer.add(workspacesSectionBody);
-
-        workspacesToggle = new WebMarkupContainer("workspacesSectionToggle");
-        workspacesToggle.setOutputMarkupId(true);
-        workspacesToggle.add(
-                new org.apache.wicket.AttributeModifier("aria-expanded", () -> workspacesExpanded ? "true" : "false"));
-        workspacesToggle.add(
-                new org.apache.wicket.AttributeModifier("aria-controls", () -> workspacesSectionBody.getMarkupId()));
-        workspacesToggle.add(new AjaxEventBehavior("click") {
-            @Override
-            protected void onEvent(AjaxRequestTarget target) {
-                workspacesExpanded = !workspacesExpanded;
-                persistSectionStateInSession();
-                target.add(workspacesSectionBody);
-                target.add(workspacesToggle);
-                target.appendJavaScript(initCall());
-            }
-        });
-        workspacesToggle.add(new ToggleCaretIcon("workspacesSectionToggleIcon", () -> workspacesExpanded));
-        workspacesSectionContainer.add(workspacesToggle);
-
-        AjaxLink<Void> workspacesSectionSelect = new AjaxLink<>("workspacesSectionSelect") {
-            @Override
-            public void onClick(AjaxRequestTarget target) {
-                workspacesExpanded = !workspacesExpanded;
-                persistSectionStateInSession();
-                target.add(workspacesSectionBody);
-                target.add(workspacesToggle);
-                target.appendJavaScript(initCall());
-                navigateToHome(null, null);
-            }
-        };
-        workspacesSectionContainer.add(workspacesSectionSelect);
-        workspacesSectionContainer.add(new Label("workspacesCount", new LoadableDetachableModel<String>() {
-            @Override
-            protected String load() {
-                return String.valueOf(getTotalWorkspaceItems());
-            }
-        }));
-
-        workspacesScroll = new WebMarkupContainer("workspacesScroll");
-        workspacesScroll.setOutputMarkupId(true);
-        workspacesSectionBody.add(workspacesScroll);
-
-        workspacesPagination = new WebMarkupContainer("workspacesPagination") {
-            @Override
-            public boolean isVisible() {
-                return selectedWorkspaceName == null && getTotalWorkspaceItems() > PAGE_SIZE;
-            }
-        };
-        workspacesPagination.setOutputMarkupId(true);
-        workspacesPagination.add(
-                new org.apache.wicket.AttributeModifier("data-current-page", () -> String.valueOf(workspacesPage)));
-        workspacesPagination.add(
-                new org.apache.wicket.AttributeModifier("data-page-size", () -> String.valueOf(workspacesPageSize)));
-        workspacesPagination.add(new org.apache.wicket.AttributeModifier(
-                "data-total-items", () -> String.valueOf(getTotalWorkspaceItems())));
-        workspacesPagination.add(new org.apache.wicket.AttributeModifier(
-                "data-total-pages",
-                () -> String.valueOf((int) Math.ceil(getTotalWorkspaceItems() / (double) workspacesPageSize))));
-        workspacesSectionBody.add(workspacesPagination);
 
         noDataMessage = new WebMarkupContainer("noDataMessage") {
             @Override
@@ -399,6 +293,7 @@ public class NavigationTreePanel extends Panel {
                 if (ws.name.equals(selectedWorkspaceName)) {
                     item.add(AttributeAppender.append("class", "is-active"));
                 }
+                select.add(AttributeModifier.replace("title", ws.name));
                 Label workspaceName = new Label("workspaceName", highlightTreeText(ws.name));
                 workspaceName.setEscapeModelStrings(false);
                 select.add(workspaceName);
@@ -461,6 +356,7 @@ public class NavigationTreePanel extends Panel {
                                         navigateToHome(ws.name, childInfo.name);
                                     }
                                 };
+                                layerSelect.add(AttributeModifier.replace("title", childInfo.name));
                                 if (ws.name.equals(selectedWorkspaceName) && childInfo.name.equals(selectedLayerName)) {
                                     child.add(AttributeAppender.append("class", "is-active"));
                                 }
@@ -488,12 +384,9 @@ public class NavigationTreePanel extends Panel {
                             trimmed.length() > MAX_QUERY_LENGTH ? trimmed.substring(0, MAX_QUERY_LENGTH) : trimmed;
 
                     globalPage = 1;
-                    workspacesPage = 1;
                     layerPageByWorkspace.clear();
-                    workspacesExpanded = true;
 
                     target.add(globalSectionContainer);
-                    target.add(workspacesSectionContainer);
                     target.add(noDataMessage);
                     target.appendJavaScript(initCall());
                     return;
@@ -505,21 +398,9 @@ public class NavigationTreePanel extends Panel {
                     globalPage = page;
                     globalPageSize = pageSize;
 
-                    target.add(globalSectionBody);
-                    target.add(globalPagination);
-                    target.appendJavaScript(initCall());
-                    return;
-                }
-
-                if ("workspaces".equals(kind)) {
-                    if (selectedWorkspaceName != null) return;
-                    int page = parsePositiveInt(p.getParameterValue("page").toOptionalString(), 1);
-                    int pageSize = parsePageSize(p.getParameterValue("pageSize").toOptionalString(), PAGE_SIZE);
-                    workspacesPage = page;
-                    workspacesPageSize = pageSize;
-
                     target.add(workspacesScroll);
-                    target.add(workspacesPagination);
+                    target.add(globalChildrenContainer);
+                    target.add(globalPagination);
                     target.appendJavaScript(initCall());
                     return;
                 }
@@ -543,24 +424,6 @@ public class NavigationTreePanel extends Panel {
 
     private static Catalog getCatalog() {
         return GeoServerApplication.get().getCatalog();
-    }
-
-    private void restoreSectionStateFromSession() {
-        GeoServerSession session = GeoServerSession.get();
-        Boolean savedGlobal = session.getMetaData(NAVTREE_GLOBAL_EXPANDED_KEY);
-        Boolean savedWorkspaces = session.getMetaData(NAVTREE_WORKSPACES_EXPANDED_KEY);
-        if (savedGlobal != null) {
-            globalExpanded = savedGlobal;
-        }
-        if (savedWorkspaces != null) {
-            workspacesExpanded = savedWorkspaces;
-        }
-    }
-
-    private void persistSectionStateInSession() {
-        GeoServerSession session = GeoServerSession.get();
-        session.setMetaData(NAVTREE_GLOBAL_EXPANDED_KEY, globalExpanded);
-        session.setMetaData(NAVTREE_WORKSPACES_EXPANDED_KEY, workspacesExpanded);
     }
 
     private Filter buildSearchFilter(String propertyName) {
@@ -700,7 +563,8 @@ public class NavigationTreePanel extends Panel {
             } else if (paramLayer != null) {
                 int idx = findGlobalChildIndex(paramLayer);
                 if (idx >= 0) {
-                    globalPage = (idx / globalPageSize) + 1;
+                    int combinedIdx = getTotalWorkspaceItems() + idx;
+                    globalPage = (combinedIdx / globalPageSize) + 1;
                 }
             }
             this.selectionInitialized = true;
@@ -772,10 +636,6 @@ public class NavigationTreePanel extends Panel {
         return hasActiveTreeFilter() || state.expanded;
     }
 
-    private boolean isGlobalExpanded() {
-        return hasActiveTreeFilter() || globalExpanded;
-    }
-
     private List<Workspace> loadWorkspaces() {
         if (selectedWorkspaceName != null) {
             List<Workspace> single = new ArrayList<>();
@@ -787,13 +647,17 @@ public class NavigationTreePanel extends Panel {
             return single;
         }
 
+        int combinedOffset = (globalPage - 1) * globalPageSize;
+        int wsCount = Math.max(0, Math.min(getTotalWorkspaceItems(), combinedOffset + globalPageSize) - combinedOffset);
+        if (wsCount <= 0) return new ArrayList<>();
+
         if (hasActiveTreeFilter()) {
             List<String> sortedNames = new ArrayList<>(matchingWorkspaces());
             sortedNames.sort(String::compareTo);
 
             List<Workspace> result = new ArrayList<>();
-            int start = Math.max(0, (workspacesPage - 1) * workspacesPageSize);
-            int end = Math.min(start + workspacesPageSize, sortedNames.size());
+            int start = Math.max(0, combinedOffset);
+            int end = Math.min(start + wsCount, sortedNames.size());
 
             for (int i = start; i < end; i++) {
                 String wsName = sortedNames.get(i);
@@ -803,10 +667,9 @@ public class NavigationTreePanel extends Panel {
             return result;
         }
 
-        int offset = Math.max(0, (workspacesPage - 1) * workspacesPageSize);
         List<Workspace> result = new ArrayList<>();
         try (CloseableIterator<WorkspaceInfo> it =
-                getCatalog().list(WorkspaceInfo.class, Filter.INCLUDE, offset, workspacesPageSize, ALPHABETICAL)) {
+                getCatalog().list(WorkspaceInfo.class, Filter.INCLUDE, combinedOffset, wsCount, ALPHABETICAL)) {
             while (it.hasNext()) {
                 WorkspaceInfo wi = it.next();
                 WorkspaceState state = workspaceStates.computeIfAbsent(wi.getName(), n -> new WorkspaceState());
