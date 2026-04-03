@@ -500,7 +500,7 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
         link.add(new Label("link.label", baseTitle));
         WebMarkupContainer wsIndicator = new WebMarkupContainer("link.wsIndicator");
         if (hasWorkspace && includeWorkspace) {
-            wsIndicator.add(AttributeModifier.replace("data-ws", ws));
+            wsIndicator.add(AttributeModifier.replace("title", ws));
         } else {
             wsIndicator.setVisible(false);
         }
