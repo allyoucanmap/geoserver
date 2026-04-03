@@ -97,9 +97,12 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
     GeoServerDialog dialog;
     TabbedPanel<ITab> tabbedPanel;
 
-    /** Uses a "name" parameter to locate the workspace */
+    /** Uses a "name" or "workspace" parameter to locate the workspace */
     public WorkspaceEditPage(PageParameters parameters) {
-        String wsName = parameters.get("name").toString();
+        String wsName = parameters.get("name").toString(null);
+        if (wsName == null || wsName.isEmpty()) {
+            wsName = parameters.get("workspace").toString(null);
+        }
         WorkspaceInfo wsi = getCatalog().getWorkspaceByName(wsName);
 
         if (wsi == null) {
