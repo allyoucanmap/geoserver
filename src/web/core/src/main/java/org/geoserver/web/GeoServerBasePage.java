@@ -746,17 +746,20 @@ public class GeoServerBasePage extends WebPage implements IAjaxIndicatorAware {
      * then {@link GeoServerHomePage} is used.
      */
     protected void doReturn(Class<? extends Page> defaultPageClass) {
+        String ws = getPageParameters().get("workspace").toOptionalString();
+        PageParameters params = (ws != null && !ws.isEmpty()) ? new PageParameters().add("workspace", ws) : null;
+
         if (returnPage != null) {
             setResponsePage(returnPage);
             return;
         }
         if (returnPageClass != null) {
-            setResponsePage(returnPageClass);
+            setResponsePage(returnPageClass, params);
             return;
         }
 
         defaultPageClass = defaultPageClass != null ? defaultPageClass : GeoServerHomePage.class;
-        setResponsePage(defaultPageClass);
+        setResponsePage(defaultPageClass, params);
     }
 
     public void addFeedbackPanels(AjaxRequestTarget target) {
