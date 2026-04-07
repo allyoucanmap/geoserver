@@ -32,7 +32,6 @@ import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.markup.html.form.SubmitLink;
 import org.apache.wicket.markup.html.form.TextField;
-import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
@@ -193,7 +192,15 @@ public class WorkspaceEditPage extends GeoServerSecuredPage {
         form.add(tabbedPanel);
         form.add(submitLink());
         form.add(applyLink());
-        form.add(new BookmarkablePageLink<>("cancel", WorkspacePage.class));
+        form.add(new Link<Void>("cancel") {
+            @Serial
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void onClick() {
+                doReturn(WorkspacePage.class);
+            }
+        });
         add(form);
     }
 

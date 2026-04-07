@@ -10,12 +10,14 @@ import static org.geoserver.web.data.workspace.WorkspaceProvider.ISOLATED;
 import static org.geoserver.web.data.workspace.WorkspaceProvider.NAME;
 
 import java.io.Serial;
+import java.util.Objects;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.panel.Fragment;
 import org.apache.wicket.model.IModel;
+import org.geoserver.catalog.Predicates;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.web.CatalogIconFactory;
 import org.geoserver.web.ComponentAuthorizer;
@@ -27,13 +29,22 @@ import org.geoserver.web.wicket.GeoServerDialog;
 import org.geoserver.web.wicket.GeoServerTablePanel;
 import org.geoserver.web.wicket.Icon;
 import org.geoserver.web.wicket.SimpleBookmarkableLink;
+import org.geotools.api.filter.Filter;
 
 /** Lists available workspaces, links to them, allows for addition and removal */
 public class WorkspacePage extends GeoServerSecuredPage {
     @Serial
     private static final long serialVersionUID = 3084639304127909774L;
 
-    WorkspaceProvider provider = new WorkspaceProvider();
+    WorkspaceProvider provider = new WorkspaceProvider() {
+        @Override
+        protected Filter getFilter() {
+            Filter base = Objects.requireNonNull(super.getFilter());
+            String ws = getPageParameters().get("workspace").toOptionalString();
+            if (ws == null || ws.isEmpty()) return base;
+            return Predicates.and(base, Predicates.equal("name", ws));
+        }
+    };
     GeoServerTablePanel<WorkspaceInfo> table;
     GeoServerDialog dialog;
     SelectionRemovalLink removal;
