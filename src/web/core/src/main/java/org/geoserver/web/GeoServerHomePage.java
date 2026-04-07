@@ -182,20 +182,6 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
         Form<GeoServerHomePage> form = selectionForm(true);
         chooser.add(form);
 
-        Locale locale = getLocale();
-
-        InternationalString welcome =
-                InternationalStringUtils.growable(contactInfo.getInternationalWelcome(), contactInfo.getWelcome());
-        String welcomeText = welcome.toString(locale);
-        Label welcomeMessage = new Label("welcome", welcomeText);
-        welcomeMessage.setVisible(StringUtils.isNotBlank(welcomeText));
-        add(welcomeMessage);
-
-        add(belongsTo(contactInfo, locale));
-
-        add(footerMessage(contactInfo, locale));
-        add(footerContact(contactInfo, locale));
-
         if (admin) {
             // show admin some additional details
             add(adminOverview());
@@ -220,6 +206,17 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
         // When scoped to workspace/layer/group, hide it.
         contributedContent.setVisible(!hasContextParams);
         add(contributedContent);
+
+        Locale locale = getLocale();
+
+        String welcomeText = getWelcomeDescription();
+        Label welcomeMessage = new Label("welcome", welcomeText);
+        welcomeMessage.setVisible(!Strings.isEmpty(welcomeText));
+        add(welcomeMessage);
+
+        add(belongsTo(contactInfo, locale));
+        add(footerMessage(contactInfo, locale));
+        add(footerContact(contactInfo, locale));
 
         List<ServiceDescription> serviceDescriptions = new ArrayList<>();
         List<ServiceLinkDescription> serviceLinks = new ArrayList<>();
@@ -502,6 +499,80 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
         }
     }
 
+    /** Gets the title from the PageName.title resource, falling back on "GeoServer" if not found */
+    protected String getTitle() {
+        String welcomeText = getWelcomeTitle();
+        if (!Strings.isEmpty(welcomeText)) {
+            return welcomeText;
+        } else {
+            return super.getTitle();
+        }
+    }
+
+    protected String getWelcomeDescription() {
+        Locale locale = getLocale();
+
+        if (publishedInfo != null) {
+            InternationalString description = InternationalStringUtils.growable(
+                    publishedInfo.getInternationalAbstract(), publishedInfo.getAbstract());
+            return description.toString(locale);
+        } else if (workspaceInfo != null) {
+            GeoServer gs = getGeoServer();
+            ContactInfo contactInfo = gs.getSettings().getContact();
+
+            SettingsInfo settings = gs.getSettings(workspaceInfo);
+            if (settings != null) {
+                contactInfo = settings.getContact();
+            }
+            InternationalString title =
+                    InternationalStringUtils.growable(contactInfo.getInternationalWelcome(), contactInfo.getWelcome());
+
+            return title.toString(locale);
+        }
+        return null; // not available
+    }
+    /**
+     * Lookup welcome title, using {@code publishedInfo} and {@code workspaceInfo} if provided.
+     *
+     * @return welcome title
+     */
+    String getWelcomeTitle() {
+        Locale locale = getLocale();
+
+        if (publishedInfo != null) {
+            InternationalString title =
+                    InternationalStringUtils.growable(publishedInfo.getInternationalTitle(), publishedInfo.getTitle());
+            return title.toString(locale);
+        } else {
+            GeoServer gs = getGeoServer();
+            ContactInfo contactInfo = gs.getSettings().getContact();
+
+            if (workspaceInfo != null) {
+                SettingsInfo settings = gs.getSettings(workspaceInfo);
+                if (settings != null && settings.getContact() != null) {
+                    contactInfo = settings.getContact();
+                }
+            }
+            InternationalString title =
+                    InternationalStringUtils.growable(contactInfo.getInternationalTitle(), contactInfo.getTitle());
+
+            return title.toString(locale);
+        }
+    }
+
+    /** Gets the page title from the contact information, falling back on PageName.title resource if not found. */
+    String getPageTitle() {
+        String titleText = getWelcomeTitle();
+        if (!Strings.isEmpty(titleText)) {
+            if ("GeoServer".equals(titleText)) {
+                return "GeoServer";
+            }
+            return "GeoServer: " + titleText;
+        } else {
+            return super.getPageTitle();
+        }
+    }
+
     @Override
     protected String getDescription() {
         return this.description;
@@ -523,9 +594,10 @@ public class GeoServerHomePage extends GeoServerBasePage implements GeoServerUnl
             @Override
             protected void populateItem(ListItem<GeoServerHomePageContentProvider> item) {
                 GeoServerHomePageContentProvider provider = item.getModelObject();
-                Component extraContent = provider.getPageBodyComponent("contentList");
+                Component extraContent = provider.getPageBodyComponent("content");
                 if (null == extraContent) {
-                    extraContent = placeholderLabel("contentList");
+                    extraContent = placeholderLabel("content");
+                    item.setVisible(false);
                 }
                 item.add(extraContent);
             }

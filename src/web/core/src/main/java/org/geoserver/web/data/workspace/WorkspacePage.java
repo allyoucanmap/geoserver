@@ -10,6 +10,8 @@ import static org.geoserver.web.data.workspace.WorkspaceProvider.ISOLATED;
 import static org.geoserver.web.data.workspace.WorkspaceProvider.NAME;
 
 import java.io.Serial;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
@@ -17,6 +19,10 @@ import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.link.BookmarkablePageLink;
 import org.apache.wicket.markup.html.panel.Fragment;
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.util.string.StringValue;
+import org.geoserver.catalog.LayerGroupHelper;
+import org.geoserver.catalog.LayerGroupInfo;
+import org.geoserver.catalog.LayerInfo;
 import org.geoserver.catalog.Predicates;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.web.CatalogIconFactory;
@@ -37,12 +43,52 @@ public class WorkspacePage extends GeoServerSecuredPage {
     private static final long serialVersionUID = 3084639304127909774L;
 
     WorkspaceProvider provider = new WorkspaceProvider() {
+
         @Override
         protected Filter getFilter() {
-            Filter base = Objects.requireNonNull(super.getFilter());
-            String ws = getPageParameters().get("workspace").toOptionalString();
-            if (ws == null || ws.isEmpty()) return base;
-            return Predicates.and(base, Predicates.equal("name", ws));
+            Filter baseFilter = Objects.requireNonNull(super.getFilter());
+            StringValue wsParam = getPageParameters().get("workspace");
+            StringValue layerParam = getPageParameters().get("layer");
+
+            if (!layerParam.isEmpty()) {
+                String targetLayer;
+                if (!wsParam.isEmpty()) {
+                    targetLayer = wsParam.toString() + ":" + layerParam.toString();
+                } else {
+                    targetLayer = layerParam.toString();
+                }
+                LayerGroupInfo gi = getCatalog().getLayerGroupByName(targetLayer);
+                if (gi != null) {
+                    LayerGroupHelper helper = new LayerGroupHelper(gi);
+                    List<String> ids = new ArrayList<String>();
+                    for (LayerInfo li : helper.allLayers()) {
+                        if (li.getResource() != null
+                                && li.getResource().getStore() != null
+                                && li.getResource().getStore().getWorkspace() != null) {
+                            String workspaceId =
+                                    li.getResource().getStore().getWorkspace().getId();
+                            ids.add(workspaceId);
+                        }
+                    }
+                    return Predicates.and(baseFilter, Predicates.in("id", ids));
+                }
+                LayerInfo li = getCatalog().getLayerByName(targetLayer);
+                if (li != null) {
+                    if (li.getResource() != null
+                            && li.getResource().getStore() != null
+                            && li.getResource().getStore().getWorkspace() != null) {
+                        String workspaceId =
+                                li.getResource().getStore().getWorkspace().getId();
+                        return Predicates.and(baseFilter, Predicates.equal("id", workspaceId));
+                    }
+                }
+            }
+            if (!wsParam.isEmpty()) {
+                String targetWs = wsParam.toString();
+                Filter workspaceFilter = Predicates.equal("resource.store.workspace.name", targetWs);
+                return Predicates.and(baseFilter, workspaceFilter);
+            }
+            return baseFilter;
         }
     };
     GeoServerTablePanel<WorkspaceInfo> table;
